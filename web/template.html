@@ -1,0 +1,461 @@
+<title>English Speaking</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: an app with two rooms. "Gaplashish": Qumri floats in a living sky, the conversation flows as bubbles, one big talk button. "So'zlar": a flip card deck with spaced review. Bottom nav switches rooms. */
+:root{
+  --sky1:#DDF1F7; --sky2:#F4F9FC; --surface:#FFFFFF; --surface2:#F1F7FA; --ink:#13294B; --muted:#5B6F8C; --line:#D3E1EB;
+  --lapis:#1F4E9C; --teal:#1FA596; --teal-deep:#137067; --saffron:#F2A93B; --rose:#E25C6B; --good:#1E8E5A;
+  --cloud:#FFFFFF; --me:#1F4E9C; --me-ink:#FFFFFF;
+  --bird:#3BBFB0; --bird-belly:#E9FBF7; --bird-wing:#2A9C90; --cheek:#F49AA6; --eye:#13294B;
+  --display:"Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  --body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --sky1:#0E2142; --sky2:#081530; --surface:#132A50; --surface2:#0F2347; --ink:#E8F0FA; --muted:#9AAECB; --line:#23406B;
+  --lapis:#8DB2F2; --teal:#46CBBB; --teal-deep:#8FE3D8; --saffron:#F6BA5C; --rose:#F07C89; --good:#5BD094;
+  --cloud:#1A3560; --me:#2E5FB4; --me-ink:#FFFFFF; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --sky1:#0E2142; --sky2:#081530; --surface:#132A50; --surface2:#0F2347; --ink:#E8F0FA; --muted:#9AAECB; --line:#23406B;
+  --lapis:#8DB2F2; --teal:#46CBBB; --teal-deep:#8FE3D8; --saffron:#F6BA5C; --rose:#F07C89; --good:#5BD094;
+  --cloud:#1A3560; --me:#2E5FB4; --me-ink:#FFFFFF; color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{background:linear-gradient(180deg,var(--sky1),var(--sky2) 70%);background-color:var(--sky2);color:var(--ink);font-family:var(--body);font-size:15px;overflow:hidden}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:3px solid var(--saffron);outline-offset:2px;border-radius:12px}
+
+/* living sky */
+.sky{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.sky i{position:absolute;background:var(--cloud);border-radius:999px;opacity:.75;filter:blur(.3px)}
+.sky i::before,.sky i::after{content:"";position:absolute;background:inherit;border-radius:50%}
+.sky i::before{width:55%;height:160%;left:15%;top:-70%}
+.sky i::after{width:40%;height:130%;left:50%;top:-45%}
+.sky .c1{width:150px;height:38px;top:9%;left:-160px;animation:drift 46s linear infinite}
+.sky .c2{width:110px;height:28px;top:24%;left:-120px;animation:drift 62s linear infinite;animation-delay:-30s;opacity:.55}
+.sky .c3{width:190px;height:44px;top:4%;left:-200px;animation:drift 80s linear infinite;animation-delay:-55s;opacity:.45}
+@keyframes drift{to{transform:translateX(calc(100vw + 420px))}}
+.calm .feather{display:none}
+.feather{position:fixed;z-index:30;pointer-events:none;width:14px;height:22px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;animation:fall 1.6s ease-out forwards}
+@keyframes fall{0%{transform:translate(0,0) rotate(0);opacity:1}100%{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+
+.app{position:relative;z-index:1;height:100%;display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:minmax(0,1fr);max-width:720px;width:100%;overflow:hidden;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top{display:flex;align-items:center;gap:8px;padding-block:12px 4px}
+.brand{font-family:var(--display);font-weight:800;font-size:24px;line-height:1;margin-right:auto;letter-spacing:.2px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avatar{width:40px;height:40px;border-radius:50%;border:2px solid var(--line);background:var(--surface);padding:2px;flex:none;overflow:hidden}
+.avatar svg{width:100%;height:100%}
+.charpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.cp{border:2px solid var(--line);background:var(--surface2);border-radius:18px;padding:6px 4px 8px;display:grid;justify-items:center;gap:2px;font-size:12.5px;font-weight:700;transition:transform .15s}
+.cp svg{width:64px;height:64px;overflow:visible}
+.cp small{font-weight:500;color:var(--muted);font-size:11px}
+.cp[aria-pressed="true"]{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 12%,var(--surface));transform:translateY(-2px)}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.sw{width:32px;height:32px;border-radius:50%;border:3px solid var(--surface);box-shadow:0 0 0 1px var(--line)}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 3px var(--ink)}
+.accs{display:flex;gap:8px;flex-wrap:wrap}
+.acc-b{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600}
+.acc-b[aria-pressed="true"]{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 16%,var(--surface));color:var(--teal-deep)}
+.vpanel{width:min(380px,100%);margin:0 auto;display:grid;gap:12px;justify-items:center;text-align:center}
+.vcard{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:26px;padding:20px 16px;display:grid;gap:6px;justify-items:center;box-shadow:0 18px 40px -22px rgba(19,41,75,.45);position:relative;overflow:hidden}
+.vcard .big{font-family:var(--display);font-size:clamp(28px,8vw,38px);font-weight:700;line-height:1.1;overflow-wrap:anywhere}
+.vcard .uz{font-family:var(--display);font-size:22px;font-weight:600;color:var(--teal-deep)}
+.vcard .ex{font-style:italic;color:var(--muted)}
+.vcard .step{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--saffron)}
+.vcard .hide{filter:blur(7px);opacity:.6}
+.vcard .bars{display:flex;gap:4px;height:22px;align-items:flex-end}
+.vcard .bars i{width:5px;border-radius:3px;background:var(--teal);height:6px}
+.vcard.playing .bars i{animation:eq .9s ease-in-out infinite}
+.vcard.playing .bars i:nth-child(2){animation-delay:.15s}.vcard.playing .bars i:nth-child(3){animation-delay:.3s}.vcard.playing .bars i:nth-child(4){animation-delay:.45s}.vcard.playing .bars i:nth-child(5){animation-delay:.6s}
+@keyframes eq{50%{height:22px}}
+.vbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.vbtn{border:0;border-radius:18px;padding:14px 10px;font-weight:700;font-size:14.5px;display:grid;gap:2px;justify-items:center}
+.vbtn small{font-weight:500;font-size:11.5px;opacity:.85}
+.vbtn.listen{background:var(--lapis);color:var(--surface)}
+.vbtn.speak{background:var(--teal);color:#fff}
+.vbtn:disabled{opacity:.4}
+.pill{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.pill svg{width:16px;height:16px}
+.ring{--p:0;width:18px;height:18px;border-radius:50%;background:conic-gradient(var(--teal) calc(var(--p)*1%),var(--line) 0)}
+.num{font-variant-numeric:tabular-nums}
+.iconbtn{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
+.iconbtn svg{width:18px;height:18px}
+
+.room{min-height:0;min-width:0;display:flex;flex-direction:column}
+
+/* ---------- talk room ---------- */
+.hero{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:2px;transition:all .35s ease}
+.charwrap{position:relative;width:min(200px,46vw);aspect-ratio:1;max-width:100%;transition:width .35s ease}
+.room.chatting .charwrap{width:min(132px,32vw)}
+.charwrap svg{width:100%;height:100%;overflow:visible;cursor:pointer;position:relative}
+.charwrap::before{content:"";position:absolute;inset:-18%;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--mood,#7FD6FF) 55%,transparent) 0%,transparent 65%);opacity:.55;transition:background .8s;pointer-events:none}
+.status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px;min-height:20px;text-align:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.status.listening .dot{background:var(--rose);animation:pulse 1s infinite}
+.status.speaking .dot{background:var(--teal);animation:pulse .6s infinite}
+.status.thinking .dot{background:var(--saffron);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{transform:scale(1.7);opacity:.5}}
+
+.feed{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-block:10px 6px;scroll-behavior:smooth;mask-image:linear-gradient(to bottom,transparent 0,#000 18px)}
+.msg{max-width:86%;display:grid;gap:6px;animation:pop .35s cubic-bezier(.3,1.5,.6,1)}
+@keyframes pop{from{transform:translateY(10px) scale(.96);opacity:0}}
+.msg.q{align-self:flex-start}
+.msg.me{align-self:flex-end}
+.bubble{padding:10px 14px;border-radius:20px;line-height:1.45;font-size:16px;min-width:0;overflow-wrap:anywhere}
+.msg.q .bubble{background:var(--surface);border:1px solid var(--line);border-top-left-radius:6px;font-family:var(--display);font-size:18px;font-weight:500;line-height:1.35}
+.msg.me .bubble{background:var(--me);color:var(--me-ink);border-bottom-right-radius:6px}
+.msg.me .bubble.live{opacity:.75}
+.tip{background:color-mix(in srgb,var(--saffron) 14%,var(--surface));border:1px solid color-mix(in srgb,var(--saffron) 45%,var(--line));border-radius:16px;padding:9px 12px;display:grid;gap:3px;font-size:14px}
+.tip .k{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--saffron)}
+.tip .said{text-decoration:line-through;text-decoration-color:var(--rose);color:var(--muted)}
+.tip .better{font-weight:700;color:var(--good)}
+.ruz{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);font-family:var(--body, inherit);font-size:14.5px;font-weight:400;font-style:italic;color:var(--muted, #667)}
+.praise{font-size:13.5px;font-weight:600;color:var(--teal-deep)}
+.mini{display:flex;gap:6px;flex-wrap:wrap}
+.chipbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:600;color:var(--lapis)}
+.wordtag{display:inline-flex;gap:6px;align-items:baseline;font-size:13px;background:var(--surface2);border:1px dashed var(--line);border-radius:12px;padding:4px 10px}
+.wordtag b{font-weight:700}
+
+.topics{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-block:6px 2px;flex:none}
+.topic{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600}
+.topic[aria-pressed="true"]{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 16%,var(--surface));color:var(--teal-deep)}
+.trow{display:grid;gap:2px;padding-top:6px;border-top:1px dashed color-mix(in srgb,var(--saffron) 40%,var(--line))}
+.tip .k + .trow{border-top:0;padding-top:0}
+.better{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:700;color:var(--good)}
+.hear{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:600;color:var(--lapis)}
+.ten{font-size:13px;color:var(--muted);font-style:italic}
+.tuz{font-size:14px}
+.explain{background:var(--surface);border:1.5px solid color-mix(in srgb,var(--lapis) 35%,var(--line));border-radius:18px;padding:11px 13px;display:grid;gap:6px;font-size:15px}
+.explain .k,.sayit .k{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lapis)}
+.explain p{margin:0;line-height:1.45}
+.explain p.uz{color:var(--muted);border-left:3px solid var(--teal);padding-left:9px}
+.explain ul{margin:0;padding-left:16px;display:grid;gap:5px}
+.explain li{cursor:pointer}
+.explain li b{display:block;font-weight:600}
+.explain li span{font-size:13px;color:var(--muted)}
+.sayit{background:var(--surface2);border-radius:16px;padding:10px 12px;display:grid;gap:6px;justify-items:start}
+.res{font-size:13.5px;color:var(--muted)}
+.res.ok{color:var(--good);font-weight:700}
+.qlabel{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);justify-self:end}
+.mpanel{display:grid;gap:10px}
+.upgrade{background:color-mix(in srgb,var(--teal, #1FA58F) 9%,var(--surface));border:1.5px solid color-mix(in srgb,var(--teal, #1FA58F) 40%,var(--line));border-radius:18px;padding:11px 13px;display:grid;gap:6px;font-size:15px}
+.upgrade .k,.growth .k{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--teal-deep, #13806e)}
+.upgrade .uen{font-family:var(--display);font-size:17px;font-weight:600;line-height:1.35}
+.upgrade .uuz{color:var(--muted);font-size:14px}
+.ures{font-size:14px;font-weight:600;border-radius:12px;padding:7px 10px}.ures.ok{background:#E3F6EC;color:#14653F}.ures.no{background:#FFF1E0;color:#8A4B00}
+.growth{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:grid;gap:10px}
+.gstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.gs{display:grid;gap:2px;text-align:center;background:var(--surface2);border-radius:14px;padding:8px 4px}.gs b{font-family:var(--display);font-size:22px}.gs span{font-size:11.5px;color:var(--muted);line-height:1.2}
+.weak{display:grid;gap:6px}.weak .wk{font-size:12.5px;color:var(--muted)}
+.wrow2{display:grid;grid-template-columns:minmax(0,1.4fr) 1fr auto;gap:8px;align-items:center;font-size:13.5px}.wrow2 .bar{height:8px;border-radius:6px;background:var(--surface2);overflow:hidden}.wrow2 .bar i{display:block;height:100%;background:#E8833A;border-radius:6px}
+.sys .bubble{font-size:14.5px !important;font-family:var(--body) !important;color:#8A4B00}
+.mlive{background:var(--surface);border:1.5px solid var(--teal);border-radius:20px;padding:14px;display:grid;gap:6px}
+.mlive .step{font-size:12px;color:var(--muted);font-weight:700}
+.mlive .better{font-size:19px;font-family:var(--display)}
+.said{text-decoration:line-through;text-decoration-color:var(--rose);color:var(--muted)}
+.mlist{display:grid;gap:8px}
+.mitem{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px 12px;display:grid;gap:3px}
+.mitem.learned{opacity:.6}
+.mmeta{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);margin-top:4px}
+#askInput{border:1px solid var(--line);background:var(--surface2);border-radius:14px;padding:10px 12px;font:inherit;font-size:16px;resize:vertical;color:var(--ink)}
+#askMic.on{background:var(--rose);color:#fff;border-color:var(--rose)}
+.seg{flex-wrap:wrap}
+.namecard input{border:1px solid var(--line);background:var(--surface2);border-radius:12px;padding:9px 11px;font:inherit;font-size:16px;color:var(--ink);width:100%}
+.topic.all{background:var(--lapis);border-color:var(--lapis);color:#fff}
+.tgrid,.stylegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.tcard,.stc{border:1.5px solid var(--line);background:var(--surface2);border-radius:16px;padding:9px 10px;display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:8px;align-items:center;text-align:left;font-size:13.5px;transition:transform .15s,border-color .15s}
+.tcard .ti,.stc .ti{font-size:22px;grid-row:span 2;line-height:1}
+.tcard small,.stc small{color:var(--muted);font-size:11.5px;line-height:1.25}
+.tcard:active,.stc:active{transform:scale(.97)}
+.tcard[aria-pressed="true"],.stc[aria-pressed="true"]{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 13%,var(--surface))}
+.ideas{display:grid;gap:6px;background:var(--surface2);border:1px dashed var(--line);border-radius:16px;padding:9px 10px}
+.ideas .k{font-size:12px;color:var(--muted);font-weight:600}
+.idea{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:6px 10px;text-align:left;font-size:14.5px;color:var(--ink)}
+.idea::before{content:"\201C";color:var(--teal);font-weight:800;margin-right:3px}
+.recap{background:linear-gradient(160deg,color-mix(in srgb,var(--teal) 14%,var(--surface)),var(--surface));border:1.5px solid color-mix(in srgb,var(--teal) 45%,var(--line));border-radius:20px;padding:12px 14px;display:grid;gap:6px;font-size:14.5px;position:relative;overflow:hidden}
+.recap .k{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--teal-deep)}
+.recap .stars{font-size:22px;color:var(--saffron);letter-spacing:2px}
+.recap p{margin:0}
+.recap .rh{font-weight:700;font-size:13px;margin-top:4px}
+.recap ul{margin:0;padding-left:18px;display:grid;gap:3px}
+.recap li.good{color:var(--good)}
+.recap s{color:var(--muted);text-decoration-color:var(--rose)}
+.recap .next{background:var(--surface);border-radius:12px;padding:7px 10px;font-weight:600;color:var(--lapis)}
+.recapb{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:700;color:var(--teal-deep)}
+
+.controls{flex:none;display:grid;grid-template-columns:44px 1fr 44px;align-items:center;justify-items:center;padding-block:8px 4px}
+.talk{position:relative;width:84px;height:84px;border-radius:50%;border:0;background:var(--teal);color:#fff;display:grid;place-items:center;box-shadow:0 10px 26px -8px var(--teal);transition:transform .15s,background .2s}
+.talk:active{transform:scale(.94)}
+.talk svg{width:34px;height:34px;position:relative;z-index:1}
+.talk .wave{position:absolute;inset:0;border-radius:50%;border:3px solid var(--teal);opacity:0;transform:scale(1)}
+.talk.on{background:var(--rose);box-shadow:0 10px 26px -8px var(--rose)}
+.talk.on .wave{border-color:var(--rose);opacity:.6;transform:scale(calc(1 + var(--lvl,0) * .9));transition:transform .08s linear}
+.talk.on .wave.w2{opacity:.3;transform:scale(calc(1 + var(--lvl,0) * 1.6))}
+.talk.on:not(.levels) .wave{animation:ripple 1.4s ease-out infinite}
+.talk.on:not(.levels) .wave.w2{animation-delay:.5s}
+@keyframes ripple{from{transform:scale(1);opacity:.6}to{transform:scale(1.7);opacity:0}}
+.talk.busy{background:var(--saffron)}
+.talk:disabled{opacity:.45}
+.under{display:flex;justify-content:center;align-items:center;gap:10px;font-size:12.5px;color:var(--muted);flex-wrap:wrap;text-align:center;padding-bottom:6px}
+.switch{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;font-size:12.5px;font-weight:600;color:var(--ink)}
+.switch i{width:30px;height:18px;border-radius:999px;background:var(--line);position:relative;transition:background .2s}
+.switch i::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s}
+.switch[aria-checked="true"] i{background:var(--teal)}
+.switch[aria-checked="true"] i::after{transform:translateX(12px)}
+.typebar{display:flex;gap:8px;align-items:flex-end;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:6px 6px 6px 14px;margin-bottom:6px}
+.typebar textarea{flex:1;min-width:0;border:0;background:none;resize:none;outline:none;padding:8px 0;max-height:100px;line-height:1.4}
+.send{border:0;background:var(--lapis);color:var(--surface);border-radius:16px;padding:9px 16px;font-weight:700}
+
+/* ---------- words room ---------- */
+.wtop{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-block:8px;flex-wrap:wrap}
+.wtop h2{font-family:var(--display);font-size:24px;margin:0;line-height:1.1}
+.wtop p{margin:0;color:var(--muted);font-size:13.5px}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px}
+.seg button{border:0;background:none;padding:6px 11px;border-radius:999px;font-size:13px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--lapis);color:var(--surface)}
+.wscroll{flex:1;min-height:0;overflow-y:auto;display:grid;gap:14px;align-content:start;padding-bottom:10px}
+.deck{perspective:1200px;display:grid;place-items:center;padding-block:6px}
+.card{position:relative;width:min(340px,100%);aspect-ratio:4/3.1;max-width:100%;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.3,1.3,.5,1);cursor:pointer}
+.card.flip{transform:rotateY(180deg)}
+.card.out-l{transition:transform .35s ease-in,opacity .35s;transform:translateX(-120%) rotate(-14deg);opacity:0}
+.card.out-r{transition:transform .35s ease-in,opacity .35s;transform:translateX(120%) rotate(14deg);opacity:0}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:26px;background:var(--surface);border:1px solid var(--line);box-shadow:0 18px 40px -22px rgba(19,41,75,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:18px;text-align:center}
+.face.back{transform:rotateY(180deg);justify-content:flex-start;overflow-y:auto}
+.face .big{font-family:var(--display);font-size:clamp(28px,8vw,40px);font-weight:700;line-height:1.1;overflow-wrap:anywhere}
+.face .sound{font-size:14px;color:var(--muted)}
+.face .uz{font-family:var(--display);font-size:24px;font-weight:600;color:var(--teal-deep);line-height:1.15}
+.face .ex{font-style:italic;color:var(--muted);font-size:14.5px}
+.face .trick{background:color-mix(in srgb,var(--saffron) 14%,var(--surface));border-radius:14px;padding:8px 10px;font-size:14px;text-align:left;width:100%}
+.face .hint{font-size:12px;color:var(--muted)}
+.box{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--saffron)}
+.rate{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:min(340px,100%);margin:0 auto}
+.rate button{border:0;border-radius:16px;padding:12px;font-weight:700;font-size:15px}
+.rate .no{background:color-mix(in srgb,var(--rose) 16%,var(--surface));color:var(--rose)}
+.rate .yes{background:var(--teal);color:#fff}
+.tools{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+.tool{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;display:flex;gap:6px;align-items:center}
+.quiz{width:min(380px,100%);margin:0 auto;display:grid;gap:10px}
+.quiz .qword{font-family:var(--display);font-size:34px;font-weight:700;text-align:center;line-height:1.1}
+.opt{border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:12px 14px;font-weight:600;font-size:15px;text-align:left;transition:transform .15s}
+.opt.right{background:color-mix(in srgb,var(--good) 18%,var(--surface));border-color:var(--good)}
+.opt.wrong{background:color-mix(in srgb,var(--rose) 16%,var(--surface));border-color:var(--rose);animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.done{text-align:center;display:grid;gap:8px;justify-items:center;padding-block:18px}
+.done .big{font-family:var(--display);font-size:26px;font-weight:700}
+.sec{display:grid;gap:8px}
+.krows{display:grid;gap:8px}
+.krow{border:1px solid var(--line);border-radius:12px;padding:10px;display:grid;gap:6px;background:var(--surface2)}
+.krow .kh{display:flex;align-items:center;gap:8px;font-weight:700}
+.krow .kh small{font-weight:500;color:var(--muted)}
+.kdot{width:10px;height:10px;border-radius:50%;background:var(--line);flex:none}
+.kdot.ok{background:var(--good)} .kdot.fail{background:var(--rose)} .kdot.rest{background:var(--saffron)}
+.krow .kin{display:flex;gap:6px} .krow .kin input{flex:1;min-width:0}
+.krow .kin .btn{padding:6px 10px;font-size:13px}
+.kout{display:grid;gap:4px;font-size:13px;line-height:1.45}
+.kout .bad{color:var(--rose)} .kout .good{color:var(--good)}
+.sec h3{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0}
+.packs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.pack{border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:10px 12px;text-align:left;display:grid;gap:2px}
+.pack b{font-size:15px}
+.pack span{font-size:12px;color:var(--muted)}
+.pack.added{opacity:.55}
+.wl{display:grid;gap:6px}
+.wrow{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 12px}
+.wrow b{font-weight:700}
+.wrow small{color:var(--muted)}
+.lv{display:flex;gap:3px}
+.lv i{width:7px;height:14px;border-radius:3px;background:var(--line)}
+.lv i.on{background:var(--teal)}
+.empty{color:var(--muted);font-size:14px}
+
+/* bottom nav */
+.nav{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding-block:6px max(10px,env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+.nav button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;font-weight:700;color:var(--muted);padding:4px;border-radius:14px;position:relative}
+.nav button svg{width:24px;height:24px}
+.nav button[aria-selected="true"]{color:var(--teal-deep)}
+.nav .badge{position:absolute;top:0;left:calc(50% + 8px);background:var(--rose);color:#fff;border-radius:999px;font-size:10.5px;padding:0 6px;font-variant-numeric:tabular-nums}
+
+/* settings sheet */
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top-left-radius:24px;border-top-right-radius:24px;border:1px solid var(--line);transform:translateY(105%);transition:transform .3s ease;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:grid;gap:12px;max-height:80vh;overflow-y:auto;box-shadow:0 -20px 40px -20px rgba(0,0,0,.3)}
+.sheet.open{transform:none}
+.sheet h2{font-family:var(--display);font-size:22px;margin:0;display:flex;justify-content:space-between;align-items:center}
+.sheet label{display:grid;gap:4px;font-size:13px;font-weight:600}
+.sheet label.chk{display:flex;gap:8px;align-items:center;font-weight:500}
+.sheet input:not([type=checkbox]),.sheet select{border:1px solid var(--line);background:var(--surface2);border-radius:10px;padding:8px 10px;font-weight:400}
+.note{font-size:13px;color:var(--muted);line-height:1.5}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 14px;font-weight:600;font-size:14px}
+.btn.primary{border:0;background:var(--teal);color:#fff}
+.days{display:grid;grid-template-columns:repeat(14,1fr);gap:4px}
+.days i{aspect-ratio:1;border-radius:5px;background:var(--line);display:block}
+.days i.l1{background:color-mix(in srgb,var(--teal) 45%,var(--line))}
+.days i.l2{background:var(--teal)}
+.days i.today{outline:2px solid var(--saffron);outline-offset:1px}
+
+%%CHARCSS%%
+#q.hop .float{animation:hop .5s ease-in-out}
+#q .look{transition:transform .45s cubic-bezier(.3,1.4,.5,1)}
+@media (prefers-reduced-motion: reduce){.sky i,.feather,.msg,.card{animation:none!important;transition:none!important}}
+@media (max-width:480px){.brand{font-size:23px}.msg{max-width:92%}.msg.q .bubble{font-size:17px}}
+</style>
+
+<div class="sky" aria-hidden="true"><i class="c1"></i><i class="c2"></i><i class="c3"></i></div>
+<div class="app">
+  <header class="top">
+    <button class="avatar" id="openChar" aria-label="Hamrohni tanlash"><svg id="avatarSvg" viewBox="0 0 240 240" aria-hidden="true"></svg></button>
+    <div class="brand" id="brand"></div>
+    <button class="pill" id="streakPill" aria-label="Kunlik natija">
+      <svg viewBox="0 0 24 24" fill="var(--saffron)"><path d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3-1-6 1-9.5z"/></svg>
+      <span class="num" id="streakNum">0</span>
+      <span class="ring" id="goalRing" aria-hidden="true"></span>
+      <span class="num" id="goalText">0/10</span>
+    </button>
+    <button class="iconbtn" id="openSettings" aria-label="Sozlamalar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <section class="room" id="room-talk">
+    <div class="hero">
+      <div class="charwrap">
+%%SVG%%
+      </div>
+      <div class="status" id="status"><span class="dot"></span><span id="statusText">Tayyor</span></div>
+    </div>
+    <div class="feed" id="feed" aria-live="polite"></div>
+    <div class="topics" id="topics" role="group" aria-label="Mavzu"></div>
+    <div class="typebar" id="typebar" hidden>
+      <textarea id="input" rows="1" placeholder="Inglizcha yoki o'zbekcha yozing…" aria-label="Xabar"></textarea>
+      <button class="send" id="send">Yubor</button>
+    </div>
+    <div class="controls">
+      <button class="iconbtn" id="kbBtn" aria-label="Yozib yuborish">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
+      </button>
+      <button class="talk" id="talk" aria-label="Gapirish">
+        <span class="wave"></span><span class="wave w2"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+      <button class="iconbtn" id="replayBtn" aria-label="Oxirgi gapni qayta eshitish">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+      </button>
+    </div>
+    <div class="under">
+      <span id="hint">Bosing va gapiring</span>
+      <button class="recapb" id="askBtn" type="button">Savol berish</button>
+      <button class="recapb" id="recapBtn" type="button">Xulosa</button>
+      <button class="switch" id="handsfree" role="switch" aria-checked="true"><i></i>Jonli suhbat</button>
+    </div>
+  </section>
+
+  <section class="room" id="room-words" hidden>
+    <div class="wtop">
+      <div><h2 id="wTitle">So'zlar</h2><p id="wSub"></p></div>
+      <div class="seg" role="group" aria-label="Mashq turi">
+        <button aria-pressed="true" data-wm="cards">Kartochka</button>
+        <button aria-pressed="false" data-wm="quiz">Test</button>
+        <button aria-pressed="false" data-wm="voice">Ovozli</button>
+        <button aria-pressed="false" data-wm="mistakes">Xatolar</button>
+      </div>
+    </div>
+    <div class="wscroll">
+      <div id="practice"></div>
+      <div class="sec"><h3>Tayyor to'plamlar</h3><div class="packs" id="packs"></div></div>
+      <div class="sec"><h3>Mening so'zlarim</h3><div class="wl" id="wordList"></div></div>
+    </div>
+  </section>
+
+  <nav class="nav" role="tablist">
+    <button role="tab" aria-selected="true" data-room="talk">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Gaplashish
+    </button>
+    <button role="tab" aria-selected="false" data-room="words">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="13" height="16" rx="2"/><path d="M8 3h11a2 2 0 0 1 2 2v13"/></svg>So'zlar<span class="badge" id="dueBadge" hidden>0</span>
+    </button>
+  </nav>
+</div>
+
+<aside class="sheet" id="charSheet" aria-label="Hamroh tanlash">
+  <h2>Hamrohingiz <button class="btn" id="closeChar">Tayyor</button></h2>
+  <label for="charName">Ismi (o'zingiz qo'ying; shu ism bilan chaqirsangiz, "Labbay!" deydi)
+    <input id="charName" maxlength="20" placeholder="Masalan: Aziza" autocomplete="off">
+  </label>
+  <div class="charpick" id="charPick"></div>
+  <div class="sec"><h3>Muloqot uslubi</h3><div class="stylegrid" id="styles"></div></div>
+  <div class="sec"><h3>Rangi</h3><div class="swatches" id="swatches"></div></div>
+  <div class="sec"><h3>Aksessuar</h3><div class="accs" id="accs"></div></div>
+  <button class="btn primary" id="hearChar">Ovozini eshitish</button>
+  <p class="note">Har bir hamrohning o'z xarakteri va ovozi bor. Uslubni almashtirsangiz, hamroh boshqacha gapiradi: jiddiy, romantik, hazilkash yoki qat'iy ustoz bo'lib.</p>
+</aside>
+
+<aside class="sheet" id="askSheet" aria-label="Savol berish">
+  <h2>Savol berish <button class="btn" id="closeAsk">Yopish</button></h2>
+  <p class="note">Ingliz tili yoki boshqa narsa haqida o'zbekcha yoki inglizcha so'rang. Javob ikki tilda, misollar bilan keladi. Masalan: "make va do ning farqi nima?", "Kechirasiz, kech qoldim inglizchasiga qanday bo'ladi?"</p>
+  <textarea id="askInput" rows="3" maxlength="600" placeholder="Savolingizni yozing…"></textarea>
+  <div style="display:flex;gap:8px">
+    <button class="btn" id="askMic" type="button">Gapirib so'rash</button>
+    <button class="btn primary" id="askSend" type="button" style="flex:1">So'rash</button>
+  </div>
+</aside>
+
+<aside class="sheet" id="topicSheet" aria-label="Mavzular">
+  <h2>Mavzular <button class="btn" id="closeTopics">Yopish</button></h2>
+  <p class="note">Mavzu tanlang: oddiy suhbat, hayotiy vaziyatlar (rol o'yini) yoki so'z o'yinlari.</p>
+  <div id="topicCats" style="display:grid;gap:12px"></div>
+</aside>
+
+<aside class="sheet" id="sheet" aria-label="Sozlamalar">
+  <h2>Sozlamalar <button class="btn" id="closeSheet">Yopish</button></h2>
+  <div class="sec"><h3>Oxirgi 14 kun</h3><div class="days" id="days"></div><p class="note" id="statLine"></p></div>
+  <label for="level">Darajam
+    <select id="level"><option value="A2">A2 (boshlang'ich)</option><option value="B1" selected>B1 (o'rta)</option><option value="B2">B2 (o'rtadan yuqori)</option><option value="C1">C1 (yuqori)</option></select>
+  </label>
+  <label for="goal">Kunlik maqsad
+    <select id="goal"><option value="5">5 daqiqa</option><option value="10" selected>10 daqiqa</option><option value="15">15 daqiqa</option><option value="20">20 daqiqa</option><option value="30">30 daqiqa</option></select>
+  </label>
+  <label for="rate">Gapirish tezligi
+    <select id="rate"><option value="0.8">Sekin</option><option value="0.95" selected>O'rtacha</option><option value="1.1">Tez</option></select>
+  </label>
+  <label for="about">Men haqimda (hamroh suhbatni shunga moslaydi)
+    <textarea id="about" rows="2" maxlength="200" placeholder="Masalan: Muhandisman. Ingliz tili ish va sayohat uchun kerak."></textarea>
+  </label>
+  <label for="ansLang">Javob tili
+    <select id="ansLang"><option value="both">Ikki tilda: inglizcha + o'zbekcha tarjimasi</option><option value="en">Faqat inglizcha</option></select>
+  </label>
+  <label for="gender">Hamroh ovozi
+    <select id="gender"><option value="auto">Hamrohning o'z ovozi</option><option value="female">Ayol ovozi</option><option value="male">Erkak ovozi</option></select>
+  </label>
+  <label for="corrections">Xatolarni tuzatish
+    <select id="corrections"><option value="all">Hamma xatolarni tushuntirsin (tavsiya)</option><option value="main">Faqat muhim xatolarni</option></select>
+  </label>
+  <div id="remindBox" class="sec" hidden><h3>Eslatmalar (bot yozadi)</h3><div class="accs" id="remindHours"></div><p class="note">Belgilangan soatlarda bot sizga savol yuboradi. Ovozli xabar bilan javob bersangiz, suhbat davom etadi va xatolaringizni tushuntiradi.</p></div>
+  <div id="adminBox" class="sec" hidden>
+    <h3>AI kalitlari (faqat siz ko'rasiz)</h3>
+    <p class="note">Kalitni shu yerda almashtirsangiz, server qayta ishga tushmasdan darhol ishlatadi. Kalitlar serverda shifrlangan holda saqlanadi, bu yerda faqat oxirgi 4 belgisi ko'rinadi.</p>
+    <div id="keyRows" class="krows"></div>
+    <button class="btn" id="checkAll">Hammasini tekshirish</button>
+    <div id="checkOut" class="kout" hidden></div>
+  </div>
+  <label for="voice" id="voiceLabel">Brauzer ovozi
+    <select id="voice"></select>
+  </label>
+  <div id="keyBox" hidden style="display:grid;gap:10px">
+    <label for="apikey">Anthropic API kaliti (suhbat uchun)
+      <input id="apikey" type="password" placeholder="sk-ant-…" autocomplete="off">
+    </label>
+    <label for="oakey">OpenAI API kaliti (jonli ovoz uchun, ixtiyoriy)
+      <input id="oakey" type="password" placeholder="sk-…" autocomplete="off">
+    </label>
+    <p class="note">Kalitlar faqat shu brauzerda saqlanadi va to'g'ridan-to'g'ri Anthropic va OpenAI'ga yuboriladi.</p>
+  </div>
+  <label class="chk" for="calm"><input type="checkbox" id="calm"> O'yinli bezaklar (uchuvchi patlar, sakrash)</label>
+  <label class="chk" for="readUz"><input type="checkbox" id="readUz" checked> O'zbekcha maslahatlarni ham ovoz chiqarib o'qisin (jonli ovozda)</label>
+  <p class="note" id="viewerNote" hidden>Bu oynada mikrofon ishlamaydi, shuning uchun yozib gaplashing. Ovozli suhbat Telegram versiyasida yoki faylni Chrome'da ochganda ishlaydi.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn" id="newChat">Yangi suhbat</button>
+    <button class="btn" id="resetAll">Barcha natijalarni o'chirish</button>
+  </div>
+</aside>
+
+<script>
+%%JS%%
+</script>
