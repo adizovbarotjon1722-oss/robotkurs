@@ -1,0 +1,12 @@
+{
+  "name": "qumri-speaking",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Qumri: AI English speaking companion as a Telegram bot + Mini App",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "build": "node build.js",
+    "start": "node server/server.js",
+    "dev": "node server/server.js --polling"
+  }
+}
