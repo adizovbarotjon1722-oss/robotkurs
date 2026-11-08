@@ -205,6 +205,7 @@ async function complete(messages, max) {
 function whyText(e) {
   const w = String(e.why || '');
   if (e.code === 'empty') return "bo'sh javob qaytardi";
+  if (/terms acceptance/i.test(w)) return "Groq saytida shu ovoz modeli uchun shartlarni qabul qiling (console.groq.com/playground?model=canopylabs/orpheus-v1-english → Accept)";
   if (e.name === 'AbortError') return 'javob kelmadi (' + AI_TIMEOUT / 1000 + ' s)';
   if (e.http === 401 || e.http === 403 || /invalid.*key|api key not valid|unauthor/i.test(w)) return "kalit noto'g'ri yoki bloklangan";
   if (e.http === 402 || /credit|billing|quota|balance/i.test(w)) return "kredit (pul) tugagan yoki limit to'lgan";
@@ -310,7 +311,7 @@ async function groqSpeak(text, female) {
       let why = ''; try { const e = await r.json(); why = (e.error && e.error.message) || ''; } catch (x) {}
       console.error('ovoz (groq ' + groqTtsModel + ')', r.status, String(why).slice(0, 300));
       if (/terms/i.test(why)) console.log("  -> console.groq.com saytida shu model uchun shartlarni (terms) qabul qiling, keyin ovoz ishlaydi.");
-      const e = new ApiError(r.status === 429 ? 'rate_limited' : 'upstream', 502); e.http = r.status; throw e;
+      const e = new ApiError(r.status === 429 ? 'rate_limited' : 'upstream', 502); e.http = r.status; e.why = why; throw e;
     }
     out.push(Buffer.from(await r.arrayBuffer()));
   }
