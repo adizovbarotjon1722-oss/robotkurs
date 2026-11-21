@@ -228,7 +228,30 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .face .trick{background:color-mix(in srgb,var(--saffron) 14%,var(--surface));border-radius:14px;padding:8px 10px;font-size:14px;text-align:left;width:100%}
 .face .hint{font-size:12px;color:var(--muted)}
 .box{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--saffron)}
-.rate{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:min(340px,100%);margin:0 auto}
+.rate{display:grid;grid-template-columns:1fr .8fr 1fr;gap:8px;width:min(360px,100%);margin:0 auto}
+.rate .hard{background:color-mix(in srgb,var(--saffron) 22%,var(--surface));color:color-mix(in srgb,var(--saffron) 60%,var(--ink))}
+.knew{display:block;margin:8px auto 0;border:0;background:none;color:var(--muted);font-size:13px;text-decoration:underline}
+.write .uzq{font-size:26px}
+.write .ex{text-align:center;color:var(--ink)}
+.cloze{text-align:center;color:var(--muted);font-size:15px;line-height:1.4}
+.winput{width:100%;font-size:20px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-align:center}
+.wrow2{display:flex;gap:8px;justify-content:center}
+.wfb{text-align:center;font-weight:700;min-height:1.4em}
+.wfb.good{color:var(--good)} .wfb.close{color:var(--saffron)} .wfb.bad{color:var(--rose)}
+.course{border:1px solid var(--line);background:var(--surface);border-radius:18px;padding:12px;display:grid;gap:10px}
+.chead{display:grid;gap:2px} .chead b{font-size:15px} .chead span{font-size:12px;color:var(--muted)}
+.clv{display:grid;gap:6px}
+.clrow{display:grid;grid-template-columns:minmax(96px,auto) 1fr auto;gap:8px;align-items:center;font-size:12px}
+.clrow small{color:var(--muted);font-variant-numeric:tabular-nums}
+.cbar{position:relative;height:8px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.cbar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px}
+.cbar .a{background:color-mix(in srgb,var(--teal) 30%,var(--surface2))} .cbar .b{background:var(--teal)}
+.cper{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.cacts{display:flex;gap:8px;flex-wrap:wrap}
+.known{display:grid;gap:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface2);border-radius:99px;padding:6px 10px;font-size:14px;font-weight:600;color:var(--ink)}
+.chip.on{background:var(--teal);border-color:var(--teal);color:#fff}
 .rate button{border:0;border-radius:16px;padding:12px;font-weight:700;font-size:15px}
 .rate .no{background:color-mix(in srgb,var(--rose) 16%,var(--surface));color:var(--rose)}
 .rate .yes{background:var(--teal);color:#fff}
@@ -353,12 +376,15 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
       <div class="seg" role="group" aria-label="Mashq turi">
         <button aria-pressed="true" data-wm="cards">Kartochka</button>
         <button aria-pressed="false" data-wm="quiz">Test</button>
+        <button aria-pressed="false" data-wm="write">Yozish</button>
         <button aria-pressed="false" data-wm="voice">Ovozli</button>
         <button aria-pressed="false" data-wm="mistakes">Xatolar</button>
       </div>
     </div>
     <div class="wscroll">
       <div id="practice"></div>
+      <div class="sec"><h3>3000 so'z kursi</h3><div class="course" id="course"></div></div>
+      <div class="sec"><h3>Gap qoliplari (eng ko'p ishlatiladigan)</h3><div class="packs" id="patPacks"></div></div>
       <div class="sec"><h3>Tayyor to'plamlar</h3><div class="packs" id="packs"></div></div>
       <div class="sec"><h3>Mening so'zlarim</h3><div class="wl" id="wordList"></div></div>
     </div>

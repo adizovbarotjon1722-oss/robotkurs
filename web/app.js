@@ -612,6 +612,32 @@ const PACKS = {
   work:   { uz:"Ish va o'qish", items:"deadline|oxirgi muddat|The deadline is Friday.;colleague|hamkasb|My colleague helped me.;salary|maosh|The salary is good.;improve|yaxshilamoq|I want to improve my English.;skill|ko'nikma|Speaking is an important skill.;goal|maqsad|My goal is to speak fluently.;schedule|jadval|My schedule is full.;experience|tajriba|I have two years of experience.;achieve|erishmoq|You can achieve it!;give up|taslim bo'lmoq|Don't give up!" }
 };
 Object.entries(window.QumriPacks || {}).forEach(([k, p]) => { if (!PACKS[k]) PACKS[k] = p; });
+/* ===== 3000-word course (by frequency, 6 levels) and sentence patterns ===== */
+const CORE = (() => {
+  const c = window.QumriCore || {};
+  const list = c.words ? c.words.split('~').map((s, i) => { const [w, uz, ex] = s.split('|'); return { w, uz, ex, i }; }) : [];
+  return { list, levels: c.levels || [], patterns: c.patterns || [] };
+})();
+(CORE.patterns || []).forEach((g, i) => { PACKS['pat' + i] = { uz: g.uz, list: g.list, pat: true }; });
+const CORE_LV = ["1-bosqich · eng zarur", '2-bosqich', '3-bosqich', '4-bosqich', '5-bosqich', '6-bosqich'];
+const levelOf = i => { let l = 0; while (l < CORE.levels.length && i >= CORE.levels[l]) l++; return l; };
+const coreN = () => Math.max(0, Math.min(30, settings.coreN == null ? 10 : +settings.coreN));
+const wordSet = () => new Set(words.map(x => String(x.w).toLowerCase()));
+/* add today's new course words (once a day), but don't pile up unseen ones */
+function coreDaily(force){
+  if (!CORE.list.length || (!force && (!coreN() || settings.coreDay === today()))) return 0;
+  const waiting = words.filter(w => w.src === 'core' && !w.box && !w.seen).length;
+  const want = force ? (coreN() || 10) : Math.max(0, Math.min(coreN(), coreN() * 2 - waiting));
+  const have = wordSet(); let n = 0;
+  for (const x of CORE.list){
+    if (n >= want) break;
+    if (have.has(x.w.toLowerCase())) continue;
+    words.push({ w:x.w, uz:x.uz, ex:x.ex, box:0, due:today(), src:'core' }); n++;
+  }
+  if (!force){ settings.coreDay = today(); saveSettings(); }
+  if (n){ LS.set('words', words); queue = []; }
+  return n;
+}
 const packItems = p => p.list || p.items.split(';').map(s => { const [w, uz, ex] = s.split('|'); return { w, uz, ex }; });
 const hasWord = w => words.some(x => x.w.toLowerCase() === String(w).toLowerCase().trim());
 function addWords(list, src){
@@ -627,15 +653,19 @@ function addWords(list, src){
 }
 const due = () => words.filter(w => w.due <= today() && w.box < STEPS.length - 1);
 function grade(w, ok){
-  if (ok){ w.box = Math.min(STEPS.length - 1, w.box + 1); w.due = addDays(STEPS[w.box]); }
+  /* ok: true (bilaman), false (eslay olmadim), 'hard' (qiyin: same step, sooner), 'known' (already knew it) */
+  if (ok === 'known'){ w.box = 5; w.due = addDays(30); }
+  else if (ok === 'hard'){ w.box = Math.max(1, w.box); w.due = addDays(Math.max(1, Math.floor(STEPS[w.box] / 2))); }
+  else if (ok){ w.box = Math.min(STEPS.length - 1, w.box + 1); w.due = addDays(STEPS[w.box]); }
   else { w.box = Math.min(w.box, 1); w.due = today(); }
   w.seen = (w.seen||0) + 1; LS.set('words', words); activity();
 }
 let wmode = 'cards', queue = [], cur = null, sessionOk = 0;
-function buildQueue(){ queue = due().sort((a,b) => a.box - b.box).slice(0, 20); }
+function buildQueue(){ queue = due().sort((a,b) => (b.box - a.box) || 0).slice(0, 25); }
 function renderPractice(){
   const box = $('practice'); box.innerHTML = '';
   if (wmode === 'mistakes'){ $('wSub').textContent = `${mistakes.length} ta xato · ${mistakes.filter(m => (m.ok||0) >= 2).length} tasi o'zlashtirildi`; return renderMistakes(box); }
+  if (wmode !== 'voice') coreDaily();
   $('wSub').textContent = `${due().length} ta takrorlash · ${words.filter(w => w.box >= 4).length} ta yodlangan`;
   if (!words.length){
     const d = el('div','done'); d.append(el('div','big',"Keling, so'z yig'amiz!"), el('div','note',"Pastdan to'plam tanlang yoki hamrohingiz bilan gaplashing: suhbatdagi yangi so'zlar shu yerga o'zi tushadi.")); box.append(d); return;
@@ -651,6 +681,7 @@ function renderPractice(){
   }
   if (wmode === 'voice') return renderVoice(box);
   if (wmode === 'quiz' && words.length >= 4) return renderQuiz(box);
+  if (wmode === 'write' && cur.src !== 'pattern') return renderWrite(box);
   renderCard(box);
 }
 function renderCard(box){
@@ -672,15 +703,16 @@ function renderCard(box){
   if (!cur.trick) tools.append(btn('tool','Yodlash hiylasi', () => getTrick(cur)));
   if (!micBlocked) tools.append(btn('tool',"Aytib ko'rish", () => sayIt(cur)));
   box.append(tools);
-  rate.append(btn('no','Eslay olmadim', () => next(card, false)), btn('yes','Bilaman', () => next(card, true)));
+  rate.append(btn('no','Eslay olmadim', () => next(card, false)), btn('hard','Qiyin', () => next(card, 'hard')), btn('yes','Bilaman', () => next(card, true)));
   box.append(rate);
+  if (!cur.box && !cur.seen){ const k = btn('knew', "Bu so'zni oldindan bilaman, o'tkazib yuborish", () => next(card, 'known')); box.append(k); }
   setTimeout(() => speak(cur.w, 0.85), 250);
 }
 function next(card, ok){
   grade(cur, ok); queue.shift(); if (!ok) queue.push(cur); else sessionOk++;
   if (ok && TG && TG.HapticFeedback) try { TG.HapticFeedback.notificationOccurred('success'); } catch(e){}
   if (card){ card.classList.add(ok ? 'out-r' : 'out-l'); setTimeout(renderPractice, 300); } else renderPractice();
-  renderBadge(); renderWordList();
+  renderBadge(); renderWordList(); renderCourse();
 }
 function renderQuiz(box){
   const reverse = Math.random() < 0.4, others = words.filter(w => w !== cur).sort(() => Math.random() - 0.5).slice(0, 3);
@@ -716,17 +748,99 @@ function sayIt(w){
     else { emote('gentle'); status('', `"${t}" deb eshitdim. Sekin tinglab, yana urinib ko'ring.`); speak(w.w, 0.7); }
   }});
 }
+/* "Yozish": see the Uzbek meaning (and the example with a gap), type the English. Active recall sticks best. */
+const escRe = t => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const plain = t => String(t).toLowerCase().replace(/[’`]/g, "'").replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim();
+function near(a, b){
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, d = 0;
+  while (i < a.length && j < b.length){ if (a[i] === b[j]){ i++; j++; continue; } if (++d > 1) return false; if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; } }
+  return d + (a.length - i) + (b.length - j) <= 1;
+}
+function renderWrite(box){
+  const w = cur, wr = el('div','quiz write');
+  wr.append(el('div','box', w.box ? BOXNAME[w.box] + ' · inglizchasini yozing' : 'Inglizchasini yozing'), el('div','qword uzq', w.uz));
+  const re = new RegExp('\\b' + escRe(w.w) + "[a-z']*", 'i');
+  if (w.ex && re.test(w.ex)) wr.append(el('div','cloze', w.ex.replace(re, '_____')));
+  const inp = el('input','winput'); inp.type = 'text'; inp.autocomplete = 'off'; inp.setAttribute('autocapitalize','off'); inp.spellcheck = false; inp.placeholder = 'Inglizcha…';
+  const fb = el('div','wfb'); let shown = 0, done = false;
+  const hint = btn('tool','Yordam (1 harf)', () => { shown = Math.min(w.w.length, shown + 1); inp.value = w.w.slice(0, shown); inp.focus(); });
+  const go = btn('btn primary','Tekshirish', check);
+  function check(){
+    if (done){ return next(null, done.res); }
+    const a = plain(inp.value), b = plain(w.w);
+    if (!a){ inp.focus(); return; }
+    const ok = a === b, close = !ok && b.length > 3 && near(a, b);
+    const res = ok ? (shown ? 'hard' : true) : close ? 'hard' : false;
+    done = { res };
+    inp.disabled = true; hint.hidden = true;
+    fb.className = 'wfb ' + (ok ? 'good' : close ? 'close' : 'bad');
+    fb.textContent = ok ? (shown ? "To'g'ri (yordam bilan)." : "To'g'ri! Barakalla.") : close ? `Deyarli! To'g'risi: ${w.w}` : `To'g'risi: ${w.w}`;
+    if (ok) feathers(fb, 6);
+    if (w.ex) wr.append(el('div','ex', w.ex));
+    speak(w.w + (w.ex ? '. ' + w.ex : ''), 0.85);
+    go.textContent = 'Keyingisi';
+  }
+  inp.onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); check(); } };
+  const row = el('div','wrow2'); row.append(hint, go);
+  wr.append(inp, row, fb); box.append(wr);
+  setTimeout(() => { try { inp.focus(); } catch(e){} }, 200);
+}
+
+/* 3000-word course card: progress by level, words per day, quick "I already know these" check */
+function renderCourse(){
+  const box = $('course'); if (!box) return; box.innerHTML = '';
+  if (!CORE.list.length){ box.hidden = true; return; }
+  const map = new Map(words.map(w => [String(w.w).toLowerCase(), w]));
+  const lv = CORE_LV.map(() => ({ total:0, added:0, learned:0 }));
+  CORE.list.forEach(x => { const l = lv[levelOf(x.i)]; l.total++; const w = map.get(x.w.toLowerCase()); if (w){ l.added++; if (w.box >= 4) l.learned++; } });
+  const added = lv.reduce((a, l) => a + l.added, 0), learned = lv.reduce((a, l) => a + l.learned, 0);
+  const head = el('div','chead'); head.append(el('b', null, `${learned} ta yodlangan · ${added} / ${CORE.list.length} boshlangan`), el('span', null, "Eng ko'p ishlatiladigan so'zlar, chastota bo'yicha"));
+  box.append(head);
+  const bars = el('div','clv');
+  lv.forEach((l, i) => {
+    const r = el('div','clrow'); const bar = el('div','cbar'); const a = el('i','a'), b = el('i','b');
+    a.style.width = (l.added / l.total * 100).toFixed(1) + '%'; b.style.width = (l.learned / l.total * 100).toFixed(1) + '%';
+    bar.append(a, b); r.append(el('span', null, CORE_LV[i]), bar, el('small', null, `${l.learned}/${l.total}`)); bars.append(r);
+  });
+  box.append(bars);
+  const per = el('div','cper'); per.append(el('span', null, "Kuniga yangi so'z:"));
+  const seg = el('div','seg');
+  [0, 5, 10, 15, 20].forEach(n => { const b = btn('', n ? String(n) : "To'xtat", () => { settings.coreN = n; saveSettings(); renderCourse(); }); b.setAttribute('aria-pressed', coreN() === n); seg.append(b); });
+  per.append(seg); box.append(per);
+  const acts = el('div','cacts');
+  acts.append(btn('btn', `+${coreN() || 10} ta so'z hozir`, () => { const n = coreDaily(true); emote(n ? 'excited' : 'gentle'); status('', n ? `${n} ta yangi so'z qo'shildi. Kartochkadan boshlang!` : "Hamma so'zlar qo'shib bo'lingan!"); renderWordsRoom(); }));
+  acts.append(btn('btn', "Bilganlarimni belgilash", () => renderKnown(box)));
+  box.append(acts);
+}
+/* show the next 40 words; tap the ones you already know, they skip straight to "yodlangan" */
+function renderKnown(box){
+  const have = wordSet(), next40 = CORE.list.filter(x => !have.has(x.w.toLowerCase())).slice(0, 40), pick = new Set();
+  const p = el('div','known');
+  p.append(el('p','note',"Biladigan so'zlaringizni bosing. Ular yodlanganlar qatoriga o'tadi va bir oydan keyin bir marta tekshiriladi. Qolganlari navbat bilan o'rgatiladi."));
+  const chips = el('div','chips');
+  next40.forEach(x => { const c = btn('chip', x.w, () => { pick.has(x) ? pick.delete(x) : pick.add(x); c.classList.toggle('on', pick.has(x)); }); c.title = x.uz; chips.append(c); });
+  p.append(chips);
+  const row = el('div','cacts');
+  row.append(btn('btn primary', 'Saqlash', () => {
+    pick.forEach(x => words.push({ w:x.w, uz:x.uz, ex:x.ex, box:5, due:addDays(30), src:'core', seen:1 }));
+    if (pick.size){ LS.set('words', words); emote('proud'); status('', `${pick.size} ta so'z "bilaman" deb belgilandi.`); }
+    renderWordsRoom();
+  }), btn('btn', 'Bekor qilish', () => renderCourse()));
+  p.append(row); box.append(p);
+}
 function renderPacks(){
-  const box = $('packs'); box.innerHTML = '';
+  const box0 = $('packs'), boxP = $('patPacks'); box0.innerHTML = ''; if (boxP) boxP.innerHTML = '';
   Object.values(PACKS).forEach(p => {
+    const box = p.pat && boxP ? boxP : box0;
     const items = packItems(p), have = items.filter(i => hasWord(i.w)).length, full = have === items.length;
     const b = btn('pack' + (full ? ' added' : ''), '', () => {
       if (full) return;
       /* 8 new words a day, so a big pack doesn't land all at once */
-      let n = 0; items.forEach(i => { if (!hasWord(i.w)) words.push({ w:i.w, uz:i.uz, ex:i.ex, box:0, due:addDays(Math.floor(n++ / 8)), src:'pack' }); });
+      let n = 0; items.forEach(i => { if (!hasWord(i.w)) words.push(Object.assign({ w:i.w, uz:i.uz, ex:i.ex, box:0, due:addDays(Math.floor(n++ / 8)), src:p.pat ? 'pattern' : 'pack' }, i.trick ? { trick:i.trick } : {})); });
       LS.set('words', words); queue = []; renderWordsRoom(); emote('excited'); feathers(b, 8);
     });
-    b.append(el('b', null, p.uz), el('span', null, full ? "Qo'shilgan" : `${items.length} ta so'z${have ? `, ${have} tasi bor` : ''}`));
+    b.append(el('b', null, p.uz), el('span', null, full ? "Qo'shilgan" : `${items.length} ta ${p.pat ? 'qolip' : "so'z"}${have ? `, ${have} tasi bor` : ''}`));
     box.append(b);
   });
 }
@@ -740,7 +854,7 @@ function renderWordList(){
   });
 }
 function renderBadge(){ const n = due().length; $('dueBadge').hidden = !n; $('dueBadge').textContent = n; }
-function renderWordsRoom(){ renderPractice(); renderPacks(); renderWordList(); renderBadge(); }
+function renderWordsRoom(){ renderPractice(); renderCourse(); renderPacks(); renderWordList(); renderBadge(); }
 document.querySelectorAll('[data-wm]').forEach(b => b.onclick = () => { stopDrill(); wmode = b.dataset.wm; document.querySelectorAll('[data-wm]').forEach(x => x.setAttribute('aria-pressed', x === b)); renderPractice(); });
 
 /* ================= words by voice =================

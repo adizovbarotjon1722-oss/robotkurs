@@ -90,6 +90,14 @@ Loyiha faqat ikki narsaga qaratilgan: **jonli inglizcha suhbat** va **oson so'z 
 OpenAI'da kredit bo'lmasa ham hamroh ovoz chiqarib gapiradi: inglizcha matnni Groq (Orpheus), o'zbekchasini Gemini o'qiydi. Ikkalasi ham bepul va siz qo'ygan kalitlar bilan ishlaydi. Ishga tushganda terminalda "Jonli ovoz: groq ✓" chiqishi kerak. Agar Groq "terms" haqida yozsa, console.groq.com saytida Playground'da Orpheus modelini oching va shartlarni bir marta qabul qiling.
 Telegram ichida telefonning o'z ovozi ko'p telefonlarda ishlamaydi, shuning uchun server ovozi muhim.
 
+## 3000 so'z kursi va gap qoliplari
+So'zlar bo'limida **3000 so'z kursi** bor: eng ko'p ishlatiladigan 3076 ta so'z (inglizcha, o'zbekcha, misol gap), chastota bo'yicha 6 bosqichga bo'lingan (`web/core3000.js`).
+- Har kuni tanlangan miqdorda (5/10/15/20) yangi so'z o'zi qo'shiladi; ko'rilmagan so'zlar to'planib qolsa, yangisi kamroq qo'shiladi.
+- "Bilganlarimni belgilash": navbatdagi 40 ta so'zdan biladiganlaringizni bosasiz, ular yodlanganlar qatoriga o'tadi.
+- Kartochkada 3 xil baho: Eslay olmadim / Qiyin / Bilaman, yangi so'zda "oldindan bilaman".
+- "Yozish" rejimi: o'zbekcha ma'no va bo'sh joyli misol gap ko'rsatiladi, inglizchasini yozasiz (1 harf xato "deyarli" deb qabul qilinadi).
+- **Gap qoliplari**: 12 mavzuda 109 ta eng kerakli qolip (Could you ...? / I've been ...ing for ... va h.k.), o'zbekcha ma'nosi va misol tarjimasi bilan.
+
 ## Ish va sayohat uchun
 - **Muhandis ishi (10 ta rol o'yini):** stand-up yig'ilish, texnik muammoni tushuntirish, obyektda xorijlik hamkasb, loyiha taqdimoti, muddat kelishuvi, ta'minotchi bilan qo'ng'iroq, chizmani tasvirlash, xavfsizlik brifingi, muhandis intervyusi, hamkasb bilan small talk.
 - **Sayohat (9 ta):** aeroport, mehmonxona, taksi, chipta, yo'qolgan bagaj, dorixona, ekskursiya, kafe, yo'l so'rash.

@@ -118,7 +118,7 @@ function cleanState(s) {
   const arr = (v, n) => (Array.isArray(v) ? v.slice(-n) : undefined);
   const str = (v, n) => String(v == null ? '' : v).slice(0, n);
   const day = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
-  if (Array.isArray(s.words)) out.words = s.words.slice(-1000).filter((w) => w && w.w).map((w) => ({
+  if (Array.isArray(s.words)) out.words = s.words.slice(-4000).filter((w) => w && w.w).map((w) => ({
     w: str(w.w, 60), uz: str(w.uz, 120), ex: str(w.ex, 200), box: Math.max(0, Math.min(6, +w.box || 0)), due: day(w.due) || '1970-01-01',
     src: str(w.src, 8), seen: Math.max(0, +w.seen || 0), used: Math.max(0, +w.used || 0), sound: str(w.sound, 60) || undefined, trick: str(w.trick, 400) || undefined, t: Math.max(0, +w.t || 0) || undefined }));
   if (Array.isArray(s.mistakes)) out.mistakes = s.mistakes.slice(-200).filter((m) => m && m.better).map((m) => ({
@@ -131,7 +131,8 @@ function cleanState(s) {
   }
   if (s.settings && typeof s.settings === 'object') {
     const t = s.settings; out.settings = { level: S.prompts.LEVELS.includes(t.level) ? t.level : 'B1', goal: Math.min(60, Math.max(1, +t.goal || 10)), rate: Math.min(1.25, Math.max(0.7, +t.rate || 0.95)), readUz: t.readUz !== false, handsfree: t.handsfree !== false, calm: t.calm !== false, corrections: t.corrections === 'main' ? 'main' : 'all', lang: t.lang === 'en' ? 'en' : 'both', about: str(t.about, 200).trim() || undefined, gender: ['female', 'male'].includes(t.gender) ? t.gender : 'auto',
-      style: S.prompts.pick(S.prompts.STYLES, t.style) ? t.style : 'samimiy', topic: S.prompts.pick(S.prompts.TOPICS, t.topic) ? t.topic : 'free' };
+      style: S.prompts.pick(S.prompts.STYLES, t.style) ? t.style : 'samimiy', topic: S.prompts.pick(S.prompts.TOPICS, t.topic) ? t.topic : 'free',
+      coreN: Math.max(0, Math.min(30, t.coreN == null ? 10 : +t.coreN || 0)), coreDay: day(t.coreDay) };
     const c = t.char || {};
     out.settings.char = { id: S.prompts.pick(S.prompts.CHARACTERS, c.id) ? c.id : 'nur', color: /^#[0-9a-fA-F]{6}$/.test(c.color || '') ? c.color : '',
       acc: ['none', 'doppi', 'glasses', 'bow', 'crown', 'phones'].includes(c.acc) ? c.acc : 'none',
@@ -177,7 +178,7 @@ async function apiRoute(req, res, url) {
   if (req.method !== 'POST') return json(res, 405, { error: 'method' });
 
   if (url.pathname === '/api/state') {
-    const raw = await readJson(req, 300 * 1024);
+    const raw = await readJson(req, 2 * 1024 * 1024);
     db.putState(user.id, mergeState(db.getState(user.id), cleanState(raw), +raw._base || 0));
     return json(res, 200, { ok: true });
   }
