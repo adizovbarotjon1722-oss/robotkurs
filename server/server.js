@@ -27,6 +27,11 @@ if (!BOT_TOKEN) { console.error('BOT_TOKEN is missing'); process.exit(1); }
 if (!WEBHOOK_SECRET && !process.env.USE_POLLING) { console.error('WEBHOOK_SECRET is missing (any long random string)'); process.exit(1); }
 
 const INDEX = fs.readFileSync(path.join(__dirname, 'public', 'index.html'));
+/* the page is ~360 KB: send it compressed (about 5 times smaller) and let the phone reuse its copy */
+const zlib = require('node:zlib');
+const INDEX_BR = zlib.brotliCompressSync(INDEX, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11 } });
+const INDEX_GZ = zlib.gzipSync(INDEX, { level: 9 });
+const INDEX_TAG = '"' + crypto.createHash('sha256').update(INDEX).digest('base64url').slice(0, 20) + '"';
 
 /* ---------- Telegram Mini App signature check ----------
    Telegram signs initData with the bot token. If the signature does not match,
@@ -92,7 +97,8 @@ async function readJson(req, limit) {
   catch (e) { throw new S.ApiError('bad_json'); }
 }
 function clientIp(req) {
-  return (process.env.TRUST_PROXY ? String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() : '') || req.socket.remoteAddress || '?';
+  /* the proxy appends the real address at the end; anything before it can be made up by the client */
+  return (process.env.TRUST_PROXY ? String(req.headers['x-forwarded-for'] || '').split(',').pop().trim() : '') || req.socket.remoteAddress || '?';
 }
 
 /* The app sends its whole copy, but the bot may have added words or mistakes since the app loaded.
@@ -105,6 +111,15 @@ function mergeState(cur, s, base) {
   };
   const out = Object.assign({}, cur, s);
   out.words = keep(cur.words, s.words, (w) => String(w.w).toLowerCase());
+  /* a word the bot reviewed after the app loaded (newer stamp) keeps the bot's result */
+  if (Array.isArray(s.words) && Array.isArray(cur.words)) {
+    const mine = new Map(cur.words.filter((w) => w && (w.t || 0) > base).map((w) => [String(w.w).toLowerCase(), w]));
+    if (mine.size) out.words = out.words.map((w) => { const b = mine.get(String(w.w).toLowerCase()); return b && (b.t || 0) > (w.t || 0) ? b : w; });
+  }
+  if (Array.isArray(s.tests) || Array.isArray(cur.tests)) {
+    const all = new Map(); (cur.tests || []).concat(s.tests || []).forEach((x) => x && x.day && all.set(x.day + '|' + (x.at || 0), x));
+    out.tests = [...all.values()].sort((a, b) => (a.at || 0) - (b.at || 0)).slice(-24);
+  }
   out.mistakes = keep(cur.mistakes, s.mistakes, (m) => String(m.better).toLowerCase());
   if (s.flu && cur.flu) { out.flu = Object.assign({}, cur.flu); for (const k in s.flu) { const a = cur.flu[k], b = s.flu[k]; out.flu[k] = !a ? b : (b.n >= a.n ? b : a); } }
   if (s.days && cur.days) { out.days = Object.assign({}, cur.days); for (const k in s.days) out.days[k] = Math.max(out.days[k] || 0, s.days[k]); }
@@ -120,7 +135,11 @@ function cleanState(s) {
   const day = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
   if (Array.isArray(s.words)) out.words = s.words.slice(-4000).filter((w) => w && w.w).map((w) => ({
     w: str(w.w, 60), uz: str(w.uz, 120), ex: str(w.ex, 200), box: Math.max(0, Math.min(6, +w.box || 0)), due: day(w.due) || '1970-01-01',
-    src: str(w.src, 8), seen: Math.max(0, +w.seen || 0), used: Math.max(0, +w.used || 0), sound: str(w.sound, 60) || undefined, trick: str(w.trick, 400) || undefined, t: Math.max(0, +w.t || 0) || undefined }));
+    src: str(w.src, 8), seen: Math.max(0, +w.seen || 0), used: Math.max(0, +w.used || 0), sound: str(w.sound, 60) || undefined, trick: str(w.trick, 400) || undefined, t: Math.max(0, +w.t || 0) || undefined, usedDay: day(w.usedDay) }));
+  if (Array.isArray(s.tests)) out.tests = s.tests.slice(-24).filter((x) => x && day(x.day)).map((x) => {
+    const n = (v, a, b) => Math.max(a, Math.min(b, Math.round(+v || 0)));
+    return { day: x.day, at: n(x.at, 0, 1e13), level: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(x.level) ? x.level : 'B1', score: n(x.score, 0, 100), f: n(x.f, 0, 10), g: n(x.g, 0, 10), v: n(x.v, 0, 10), c: n(x.c, 0, 10), wpm: n(x.wpm, 0, 400), words: n(x.words, 0, 5000) };
+  });
   if (Array.isArray(s.mistakes)) out.mistakes = s.mistakes.slice(-200).filter((m) => m && m.better).map((m) => ({
     cat: S.prompts.CATS[m.cat] ? m.cat : undefined,
     said: str(m.said, 200), better: str(m.better, 200), en: str(m.en, 200), uz: str(m.uz, 300), day: day(m.day) || '1970-01-01',
@@ -226,9 +245,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (url.pathname === '/health') return send(res, 200, 'ok', { 'content-type': 'text/plain', 'x-qumri': INSTANCE });
-    if ((url.pathname === '/' || url.pathname === '/index.html') && req.method === 'GET') {
+    if ((url.pathname === '/' || url.pathname === '/index.html') && (req.method === 'GET' || req.method === 'HEAD')) {
       logOnce('page', 'Mini App: sahifa telefonga yuborildi');
-      return send(res, 200, INDEX, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'cache-control': 'no-cache' });
+      const h = { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'cache-control': 'no-cache', etag: INDEX_TAG, vary: 'Accept-Encoding' };
+      if (String(req.headers['if-none-match'] || '').includes(INDEX_TAG)) return send(res, 304, '', h);
+      const ae = String(req.headers['accept-encoding'] || '');
+      const body = /\bbr\b/.test(ae) ? (h['content-encoding'] = 'br', INDEX_BR) : /\bgzip\b/.test(ae) ? (h['content-encoding'] = 'gzip', INDEX_GZ) : INDEX;
+      return send(res, 200, req.method === 'HEAD' ? '' : body, h);
     }
     return send(res, 404, 'not found', { 'content-type': 'text/plain' });
   } catch (e) {

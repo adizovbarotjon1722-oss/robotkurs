@@ -181,6 +181,19 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .recap li.good{color:var(--good)}
 .recap s{color:var(--muted);text-decoration-color:var(--rose)}
 .recap .next{background:var(--surface);border-radius:12px;padding:7px 10px;font-weight:600;color:var(--lapis)}
+.targets{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:2px 14px 6px;font-size:12.5px}
+.targets .tl{color:var(--muted,#6b7c93);font-weight:700}
+.targets .tw{border:1px dashed var(--teal-deep);background:transparent;color:var(--teal-deep);border-radius:999px;padding:3px 10px;font-weight:700;font-size:12.5px}
+.targets .tw.done{border-style:solid;background:var(--teal-deep);color:#fff}
+.tcard{display:grid;gap:8px}.tres{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.tlv,.tbig{font-weight:800;font-size:22px;color:var(--teal-deep)}.tbig{font-size:26px;margin:4px 0}
+.thist{display:flex;gap:6px;align-items:flex-end;height:54px}.thist i{width:18px;border-radius:5px 5px 2px 2px;background:var(--teal-deep);opacity:.8}
+.tbody{display:grid;gap:10px}.tstep{font-size:12.5px;font-weight:700;color:var(--muted,#6b7c93)}.tq{font-size:18px;font-weight:800;line-height:1.35}.tquz{font-size:13.5px;opacity:.8}
+.tbody textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;padding:10px;font:inherit;background:var(--bg,transparent);color:inherit}
+.trow2{display:flex;gap:8px;flex-wrap:wrap}.trow2 .btn.on{background:var(--rose);border-color:var(--rose);color:#fff}
+.tbars{display:grid;gap:6px;margin:6px 0}.tbar{display:grid;grid-template-columns:96px 1fr 44px;gap:8px;align-items:center;font-size:13px}
+.tbar i{height:8px;border-radius:9px;background:var(--line);position:relative;overflow:hidden}.tbar i::after{content:'';position:absolute;inset:0;width:var(--w,0);background:var(--teal-deep);border-radius:9px}
+.tcard .good,.tbody .good{color:var(--good)}.tcard .bad,.tbody .bad{color:var(--rose)}
 .recapb{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:700;color:var(--teal-deep)}
 
 .controls{flex:none;display:grid;grid-template-columns:44px 1fr 44px;align-items:center;justify-items:center;padding-block:8px 4px}
@@ -344,6 +357,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
       </div>
       <div class="status" id="status"><span class="dot"></span><span id="statusText">Tayyor</span></div>
     </div>
+    <div class="targets" id="targets" hidden></div>
     <div class="feed" id="feed" aria-live="polite"></div>
     <div class="topics" id="topics" role="group" aria-label="Mavzu"></div>
     <div class="typebar" id="typebar" hidden>
@@ -413,6 +427,11 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
   <p class="note">Har bir hamrohning o'z xarakteri va ovozi bor. Uslubni almashtirsangiz, hamroh boshqacha gapiradi: jiddiy, romantik, hazilkash yoki qat'iy ustoz bo'lib.</p>
 </aside>
 
+<aside class="sheet" id="testSheet" aria-label="Gapirish testi">
+  <h2>Oylik gapirish testi <button class="btn" id="closeTest">Yopish</button></h2>
+  <div id="testBody" class="tbody"></div>
+</aside>
+
 <aside class="sheet" id="askSheet" aria-label="Savol berish">
   <h2>Savol berish <button class="btn" id="closeAsk">Yopish</button></h2>
   <p class="note">Ingliz tili yoki boshqa narsa haqida o'zbekcha yoki inglizcha so'rang. Javob ikki tilda, misollar bilan keladi. Masalan: "make va do ning farqi nima?", "Kechirasiz, kech qoldim inglizchasiga qanday bo'ladi?"</p>
@@ -432,6 +451,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 <aside class="sheet" id="sheet" aria-label="Sozlamalar">
   <h2>Sozlamalar <button class="btn" id="closeSheet">Yopish</button></h2>
   <div class="sec"><h3>Oxirgi 14 kun</h3><div class="days" id="days"></div><p class="note" id="statLine"></p></div>
+  <div class="sec"><h3>📈 Gapirish testi (oyiga 1 marta)</h3><div id="testCard" class="tcard"></div></div>
   <label for="level">Darajam
     <select id="level"><option value="A2">A2 (boshlang'ich)</option><option value="B1" selected>B1 (o'rta)</option><option value="B2">B2 (o'rtadan yuqori)</option><option value="C1">C1 (yuqori)</option></select>
   </label>

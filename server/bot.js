@@ -2,6 +2,7 @@
 /* Telegram bot: only the essentials. Everything else lives in the Mini App. */
 const db = require('./db');
 const S = require('./services');
+const L = require('./learn');
 
 const TOKEN = process.env.BOT_TOKEN || '';
 const API = 'https://api.telegram.org/bot' + TOKEN + '/';
@@ -11,7 +12,7 @@ const ADMINS = String(process.env.ADMIN_IDS || '').split(',').map((s) => +s.trim
 let appUrl = '';
 
 async function tg(method, body) {
-  const r = await fetch(API + method, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const r = await fetch(API + method, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}), signal: AbortSignal.timeout(method === 'getUpdates' ? 45000 : 20000) });
   const j = await r.json().catch(() => ({}));
   if (!j.ok) throw new Error(method + ': ' + (j.description || r.status));
   return j.result;
@@ -28,6 +29,17 @@ function noAppButtons(extra) {
 /* Telegram refuses messages over 4096 characters: cut long ones and drop the formatting so no tag is left half open */
 const fit = (t) => (t.length <= 4000 ? t : t.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').slice(0, 3990) + '…');
 const say = (chat, text, extra) => tg('sendMessage', Object.assign({ chat_id: chat, text: fit(String(text)), parse_mode: String(text).length <= 4000 ? 'HTML' : undefined, link_preview_options: { is_disabled: true } }, noAppButtons(extra) || {}));
+/* voice messages (multipart) */
+const sendVoiceFile = (chatId, ogg, name, caption) => { const fd = new FormData(); fd.append('chat_id', String(chatId)); if (caption) fd.append('caption', caption); fd.append('voice', new Blob([ogg], { type: 'audio/ogg' }), name || 'q.ogg'); return fetch(API + 'sendVoice', { method: 'POST', body: fd, signal: AbortSignal.timeout(30000) }); };
+/* per-user flood guard: a few messages a minute is plenty for a person */
+const flood = new Map();
+function tooFast(id, perMin) {
+  const now = Date.now(), b = flood.get(id) || { n: 0, at: now };
+  if (now - b.at > 60000) { b.n = 0; b.at = now; }
+  b.n++; flood.set(id, b);
+  if (flood.size > 5000) for (const [k, v] of flood) if (now - v.at > 60000) flood.delete(k);
+  return b.n > perMin;
+}
 const appBtn = (text, mode) => ({ text, web_app: { url: appUrl + (mode ? '/?mode=' + mode : '/') } });
 const appBtn2 = (text, room) => ({ text, web_app: { url: appUrl + '/?room=' + room } });
 const appKeyboard = () => ({ inline_keyboard: [[appBtn('🗣 Gaplashish')], [appBtn2("📚 So'z yodlash", 'words')]] });
@@ -91,7 +103,7 @@ async function cmdWords(msg, user) {
   if (!d.length) return say(msg.chat.id, "🎉 Bugungi takrorlash tugagan! Ertaga yana eslataman.");
   /* the same words as a short audio lesson: listen on the way to work */
   sendWordAudio(msg.chat.id, user, d.slice(0, 6)).catch(() => {});
-  await say(msg.chat.id, "🔁 <b>Bugun takrorlash kerak:</b>\n\n" + d.map((x) => `• <b>${esc(x.w)}</b> — <tg-spoiler>${esc(x.uz)}</tg-spoiler>`).join('\n') + "\n\nTarjimasini ko'rish uchun bosing. To'liq mashq uchun:", { reply_markup: { inline_keyboard: [[appBtn2("📚 Kartochkalarni ochish", 'words')]] } });
+  await say(msg.chat.id, "🔁 <b>Bugun takrorlash kerak:</b>\n\n" + d.map((x) => `• <b>${esc(x.w)}</b> — <tg-spoiler>${esc(x.uz)}</tg-spoiler>`).join('\n') + "\n\nTarjimasini ko'rish uchun bosing. Tugmali test yoki to'liq mashq:", { reply_markup: { inline_keyboard: [[{ text: '🧠 Test (5 ta savol)', callback_data: 'rv:new:0' }], [appBtn2("📚 Kartochkalarni ochish", 'words')]] } });
 }
 async function cmdPremium(msg, user) {
   if (S.isPremium(user)) return say(msg.chat.id, `⭐ Premium faol: ${esc(user.premium_until)} gacha (UTC).`);
@@ -110,9 +122,9 @@ const hh = (h) => String(h).padStart(2, '0') + ':00';
 const remindKb = (hours) => ({ inline_keyboard: [
   db.HOURS.slice(0, 4).map((h) => ({ text: (hours.includes(h) ? '✅ ' : '') + hh(h), callback_data: 'rh:' + h })),
   db.HOURS.slice(4).map((h) => ({ text: (hours.includes(h) ? '✅ ' : '') + hh(h), callback_data: 'rh:' + h })),
-  [{ text: hours.length ? "🔕 Hammasini o'chirish" : '🔔 09:00 va 20:00', callback_data: hours.length ? 'rh:off' : 'rh:def' }]] });
+  [{ text: hours.length ? "🔕 Hammasini o'chirish" : '🔔 09:00, 15:00, 20:00', callback_data: hours.length ? 'rh:off' : 'rh:def' }]] });
 const remindText = (hours) => hours.length
-  ? `🔔 <b>Eslatmalar:</b> ${hours.map(hh).join(', ')} (Toshkent vaqti)\n\nShu soatlarda sizga inglizcha savol yuboraman. Ovozli xabar bilan javob bering: suhbat davom etadi, xatolaringizni ham tushuntiraman.\n\nSoatlarni bosib yoqing yoki o'chiring:`
+  ? `🔔 <b>Eslatmalar:</b> ${hours.map(hh).join(', ')} (Toshkent vaqti)\n\nNavbat bilan eslataman: 1-soat <b>so'z yodlash</b> (tugmali test), 2-soat <b>gapirish mashqi</b> (savol, ovozli javob), 3-soat yana <b>so'z yodlash</b>. Siz faol bo'lsangiz, bezovta qilmayman.\n\nSoatlarni bosib yoqing yoki o'chiring:`
   : "🔕 Eslatmalar o'chiq. Soat tanlang:";
 async function cmdRemind(msg, user) {
   const h = db.hours(user);
@@ -121,6 +133,9 @@ async function cmdRemind(msg, user) {
 async function onCallback(cq) {
   if (!cq.from || cq.from.is_bot) return;
   const user = db.touchUser(cq.from); if (user.banned) return;
+  if (tooFast('c' + user.id, 40)) return tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Sekinroq 🙂' }).catch(() => {});
+  const rm = String(cq.data || '').match(/^rv:([a-z0-9]{1,8}):(\d|x)$/);
+  if (rm && cq.message) return onReview(cq, user, rm[1], rm[2]);
   const sm = String(cq.data || '').match(/^set:(lang|gender):(both|en|auto|female|male)$/);
   if (sm && cq.message) {
     const st = db.getState(user.id); st.settings = st.settings || {};
@@ -133,7 +148,7 @@ async function onCallback(cq) {
   const m = String(cq.data || '').match(/^rh:(\d{1,2}|off|def)$/);
   if (!m || !cq.message) return tg('answerCallbackQuery', { callback_query_id: cq.id }).catch(() => {});
   let h = db.hours(user);
-  if (m[1] === 'off') h = []; else if (m[1] === 'def') h = [9, 20];
+  if (m[1] === 'off') h = []; else if (m[1] === 'def') h = [9, 15, 20];
   else { const x = +m[1]; h = h.includes(x) ? h.filter((y) => y !== x) : h.concat(x); }
   h = db.setHours(user.id, h);
   await tg('answerCallbackQuery', { callback_query_id: cq.id, text: h.length ? 'Saqlandi' : "O'chirildi" }).catch(() => {});
@@ -165,7 +180,7 @@ async function cmdAbout(msg, user, arg) {
 }
 async function cmdSettings(msg, user) { await say(msg.chat.id, setText(), { reply_markup: setKb(db.getState(user.id).settings) }); }
 async function cmdHelp(msg) {
-  await say(msg.chat.id, "/start — boshlash\n/stats — natijalarim\n/words — bugun takrorlanadigan so'zlar\n/premium — Premium (Telegram Stars)\n/remind — eslatma soatlari (bot o'zi savol yuboradi)\n/name — hamrohga ism berish\n/settings — javob tili (ikki tilda) va ovoz (ayol/erkak)\n/about — o'zingiz haqingizda (masalan: muhandisman), suhbat shunga moslashadi\n/report — haftalik hisobot (har yakshanba 20:00 da o'zim ham yuboraman)\n\nBotga ovozli yoki matnli xabar yuborsangiz ham, javob beraman. Ismimni yozsangiz yoki aytsangiz, \"Labbay!\" deyman.", { reply_markup: appKeyboard() });
+  await say(msg.chat.id, "/start — boshlash\n/stats — natijalarim\n/words — bugun takrorlanadigan so'zlar\n/review — so'z yodlash (tugmali test, 5 ta savol)\n/premium — Premium (Telegram Stars)\n/remind — eslatma soatlari (bot o'zi savol yuboradi)\n/name — hamrohga ism berish\n/settings — javob tili (ikki tilda) va ovoz (ayol/erkak)\n/about — o'zingiz haqingizda (masalan: muhandisman), suhbat shunga moslashadi\n/report — haftalik hisobot (har yakshanba 20:00 da o'zim ham yuboraman)\n\nBotga ovozli yoki matnli xabar yuborsangiz ham, javob beraman. Ismimni yozsangiz yoki aytsangiz, \"Labbay!\" deyman.", { reply_markup: appKeyboard() });
 }
 async function cmdAdmin(msg, user, arg) {
   if (!ADMINS.includes(user.id)) return;
@@ -180,11 +195,7 @@ async function sendWordAudio(chatId, user, list) {
   if (!list.length) return;
   const script = list.map((w) => `${w.w}. ... ${w.uz}. ... ${w.ex || w.w}. ... ${w.w}.`).join('\n\n');
   const ogg = await S.tts(user, script, 'mixed', 'happy', 0.9, 'opus');
-  const fd = new FormData();
-  fd.append('chat_id', String(chatId));
-  fd.append('caption', "🎧 Ovozli takrorlash: tinglang va ovoz chiqarib qaytaring");
-  fd.append('voice', new Blob([ogg], { type: 'audio/ogg' }), 'words.ogg');
-  await fetch(API + 'sendVoice', { method: 'POST', body: fd });
+  await sendVoiceFile(chatId, ogg, 'words.ogg', "🎧 Ovozli takrorlash: tinglang va ovoz chiqarib qaytaring");
 }
 
 /* ---------- quick chat in the bot (voice or text) ---------- */
@@ -196,16 +207,17 @@ async function quickChat(msg, user, text, dur) {
     db.putState(user.id, st);
     await say(msg.chat.id, "😊 <b>Labbay!</b> Yes, I'm here. I'm listening.\n<i>Eshitaman, gapiring.</i>");
     if (msg.voice) S.tts(user, 'Labbay! Eshitaman, gapiring.', true, 'happy', 1, 'opus', S.prompts.voiceFor((st.settings && st.settings.char && st.settings.char.id) || 'nur', st.settings && st.settings.gender))
-      .then((ogg) => { const fd = new FormData(); fd.append('chat_id', String(msg.chat.id)); fd.append('voice', new Blob([ogg], { type: 'audio/ogg' }), 'labbay.ogg'); return fetch(API + 'sendVoice', { method: 'POST', body: fd }); }).catch(() => {});
+      .then((ogg) => sendVoiceFile(msg.chat.id, ogg, 'labbay.ogg')).catch(() => {});
     return;
   }
   const turns = (st.botTurns || []).slice(-10);
   turns.push({ role: 'user', content: text });
   await tg('sendChatAction', { chat_id: msg.chat.id, action: 'typing' }).catch(() => {});
   let r;
+  const tgt = L.targets(st.words, 5);
   try {
     const ch = (st.settings && st.settings.char) || {};
-    const out = await S.runAI(user, 'chat', { character: ch.id, name: ch.name, style: st.settings && st.settings.style, corrections: st.settings && st.settings.corrections, lang: st.settings && st.settings.lang, about: st.settings && st.settings.about, weak: S.prompts.weakOf(st.mistakes).map((x) => x.cat), topic: 'free', level: (st.settings && st.settings.level) || 'B1', turns, learning: (st.words || []).filter((w) => w.box >= 1 && w.box <= 3).slice(0, 4).map((w) => w.w) });
+    const out = await S.runAI(user, 'chat', { character: ch.id, name: ch.name, style: st.settings && st.settings.style, corrections: st.settings && st.settings.corrections, lang: st.settings && st.settings.lang, about: st.settings && st.settings.about, weak: S.prompts.weakOf(st.mistakes).map((x) => x.cat), topic: 'free', level: (st.settings && st.settings.level) || 'B1', turns, learning: tgt.map((w) => w.w) });
     const m = out.text.match(/\{[\s\S]*\}/);
     try { r = m ? JSON.parse(m[0]) : null; } catch (x) { r = null; }
     if (!r || !r.reply) r = { emotion: 'happy', reply: (r && r.reply) || out.text.replace(/[{}"]/g, '').slice(0, 600) };
@@ -224,11 +236,16 @@ async function quickChat(msg, user, text, dur) {
   (Array.isArray(r.new_words) ? r.new_words : []).slice(0, 2).forEach((w) => {
     if (w && w.w && !(fresh.words || []).some((x) => x.w.toLowerCase() === String(w.w).toLowerCase())) fresh.words = (fresh.words || []).concat([{ w: String(w.w).slice(0, 60), uz: String(w.uz || '').slice(0, 120), ex: String(w.ex || '').slice(0, 200), box: 0, due: S.today(), src: 'bot', t: now }]);
   });
+  /* today's words the learner used correctly count as a successful review */
+  const usedNames = L.usedWords(text, tgt, r.used_words).map((w) => w.w.toLowerCase());
+  const used = (fresh.words || []).filter((w) => usedNames.includes(String(w.w).toLowerCase()) && w.usedDay !== L.tday());
+  used.forEach(L.markUsed);
   if (dur) fresh.flu = S.prompts.fluAdd(fresh.flu, S.today(), S.prompts.fluTurn(text, dur));
   db.putState(user.id, fresh);
 
   let out = (EMO[r.emotion] || '😊') + ' ';
   if (r.praise_uz) out += esc(r.praise_uz) + '\n\n';
+  if (used.length) out += `🎯 Bugungi so'zni to'g'ri ishlatdingiz: <b>${used.map((w) => esc(w.w)).join(', ')}</b> (yodlandi deb belgilandi)\n\n`;
   out += '<b>' + esc(r.reply || '') + '</b>';
   if (r.reply_uz && !(st.settings && st.settings.lang === 'en')) out += '\n🇺🇿 <i>' + esc(r.reply_uz) + '</i>';
   if (tips.length) out += '\n\n📝 <i>Xatolar tahlili:</i>' + tips.map((x) => '\n' + (x.said ? '❌ <s>' + esc(x.said) + '</s>\n' : '') + '✅ <b>' + esc(x.better) + '</b>' + (x.en ? '\n<i>' + esc(x.en) + '</i>' : '') + (x.uz ? '\n' + esc(x.uz) : '')).join('\n');
@@ -243,10 +260,7 @@ async function quickChat(msg, user, text, dur) {
     try {
       const ch = (st.settings && st.settings.char) || {};
       const ogg = await S.tts(user, r.reply || '', false, r.emotion, 1, 'opus', S.prompts.voiceFor(ch.id, st.settings && st.settings.gender), st.settings && st.settings.style);
-      const fd = new FormData();
-      fd.append('chat_id', String(msg.chat.id));
-      fd.append('voice', new Blob([ogg], { type: 'audio/ogg' }), 'qumri.ogg');
-      await fetch(API + 'sendVoice', { method: 'POST', body: fd });
+      await sendVoiceFile(msg.chat.id, ogg, 'qumri.ogg');
     } catch (e) { /* text reply already sent */ }
   }
 }
@@ -264,6 +278,58 @@ async function handleVoice(msg, user) {
   if (!t.text) return say(msg.chat.id, 'Hech narsa eshitmadim 🤔 Yana bir bor ayting-chi.');
   await say(msg.chat.id, '🎧 <i>' + esc(t.text) + '</i>');
   return quickChat(msg, user, t.text, t.dur || v.duration);
+}
+
+/* ---------- word review in the chat: 5 quick questions with buttons ---------- */
+const RV_N = 5;
+function rvQuestion(st) {
+  const rv = st.rv, w = (st.words || []).find((x) => x.w === rv.list[rv.i]);
+  if (!w) return null;
+  const o = L.options(w, st.words); rv.opts = o.opts; rv.right = o.right;
+  const text = `📚 <b>So'z yodlash</b> · ${rv.i + 1}/${rv.list.length}\n\n🔤 <b>${esc(w.w)}</b>${w.sound ? ' <i>[' + esc(w.sound) + ']</i>' : ''}\n\nMa'nosi qaysi?`;
+  const kb = o.opts.map((u, i) => [{ text: u, callback_data: 'rv:' + rv.id + ':' + i }]);
+  kb.push([{ text: '🤷 Bilmayman', callback_data: 'rv:' + rv.id + ':x' }]);
+  return { text, reply_markup: { inline_keyboard: kb } };
+}
+/* starts a new round; returns false when there is nothing to review */
+async function startReview(chatId, user, intro, editOf) {
+  const st = db.getState(user.id), list = L.reviewList(st.words, RV_N);
+  if (!list.length) return false;
+  st.rv = { id: Math.random().toString(36).slice(2, 8), list, i: 0, ok: 0 };
+  const q = rvQuestion(st); if (!q) return false;
+  db.putState(user.id, st);
+  const text = (intro ? intro + '\n\n' : '') + q.text;
+  if (editOf) await tg('editMessageText', { chat_id: chatId, message_id: editOf, text, parse_mode: 'HTML', reply_markup: q.reply_markup }).catch(() => say(chatId, text, { reply_markup: q.reply_markup }));
+  else await say(chatId, text, { reply_markup: q.reply_markup });
+  return true;
+}
+async function cmdReview(msg, user) {
+  const ok = await startReview(msg.chat.id, user, '');
+  if (!ok) await say(msg.chat.id, (db.getState(user.id).words || []).length ? "🎉 Bugungi takrorlash tugagan! Mini Appda yangi so'zlar oling yoki ertaga davom etamiz." : "Daftaringiz hali bo'sh. Mini Appda \"3000 so'z kursi\" ni oching.", { reply_markup: { inline_keyboard: [[appBtn2("📚 So'zlar", 'words')]] } });
+}
+async function onReview(cq, user, id, pick) {
+  const chatId = cq.message.chat.id, mid = cq.message.message_id;
+  if (id === 'new') { await tg('answerCallbackQuery', { callback_query_id: cq.id }).catch(() => {}); if (!(await startReview(chatId, user, '', mid))) await tg('editMessageText', { chat_id: chatId, message_id: mid, text: "🎉 Bugun takrorlanadigan so'z qolmadi!", parse_mode: 'HTML' }).catch(() => {}); return; }
+  const st = db.getState(user.id), rv = st.rv;
+  if (!rv || rv.id !== id || !Array.isArray(rv.opts)) return tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Bu savol eskirgan. /review' }).catch(() => {});
+  const w = (st.words || []).find((x) => x.w === rv.list[rv.i]);
+  const ok = pick !== 'x' && +pick === rv.right;
+  if (w) L.grade(w, ok);
+  if (ok) rv.ok++;
+  await tg('answerCallbackQuery', { callback_query_id: cq.id, text: ok ? "✅ To'g'ri!" : '❌ ' + String((w && w.uz) || '').slice(0, 150) }).catch(() => {});
+  const res = w ? (ok ? '✅ ' : '❌ ') + `<b>${esc(w.w)}</b> — ${esc(w.uz)}` + (w.ex ? `\n<i>${esc(w.ex)}</i>` : '') : '';
+  rv.i++; rv.opts = null;
+  let q = null;
+  while (rv.i < rv.list.length && !(q = rvQuestion(st))) rv.i++;
+  if (q) {
+    db.putState(user.id, st);
+    return tg('editMessageText', { chat_id: chatId, message_id: mid, text: res + '\n\n' + q.text, parse_mode: 'HTML', reply_markup: q.reply_markup }).catch(() => {});
+  }
+  const n = rv.list.length, good = rv.ok; delete st.rv; db.putState(user.id, st);
+  const left = (st.words || []).filter(L.isDue).length;
+  const text = res + `\n\n🏁 <b>Natija: ${good}/${n}</b> ${good === n ? '🔥 Ajoyib!' : good >= n / 2 ? "👍 Yaxshi!" : "💪 Xato qilganlaringizni ertaga yana so'rayman."}` + (left ? `\n📚 Yana ${left} ta so'z kutyapti.` : "\n🎉 Bugungi takrorlash tugadi!");
+  const kb = [[...(left ? [{ text: `🔁 Yana ${Math.min(left, RV_N)} ta`, callback_data: 'rv:new:0' }] : []), appBtn2("📚 Mini Appda", 'words')]];
+  return tg('editMessageText', { chat_id: chatId, message_id: mid, text, parse_mode: 'HTML', reply_markup: noAppButtons({ reply_markup: { inline_keyboard: kb } }).reply_markup }).catch(() => {});
 }
 
 /* ---------- payments (Telegram Stars) ---------- */
@@ -293,6 +359,7 @@ async function handleUpdate(u) {
   const user = db.touchUser(msg.from, msg.chat.id);
   if (user.banned) return;
   if (msg.successful_payment) return onPaid(msg, user);
+  if (tooFast('m' + user.id, 20)) return;
   if (msg.voice) return handleVoice(msg, user);
   const text = String(msg.text || '').trim(); if (!text) return;
   const m = text.match(/^\/(\w+)(?:@\w+)?\s*(.*)$/s);
@@ -301,6 +368,7 @@ async function handleUpdate(u) {
     if (c === 'start') return cmdStart(msg, user);
     if (c === 'stats') return cmdStats(msg, user);
     if (c === 'words') return cmdWords(msg, user);
+    if (c === 'review' || c === 'takror' || c === 'quiz') return cmdReview(msg, user);
     if (c === 'premium') return cmdPremium(msg, user);
     if (c === 'remind') return cmdRemind(msg, user);
     if (c === 'name') return cmdName(msg, user, m[2]);
@@ -356,36 +424,73 @@ const DAILY_Q = [
 const tashHour = () => +new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tashkent', hour: '2-digit', hour12: false }).format(new Date());
 async function sendVoiceText(chatId, user, text, voice, style) {
   const ogg = await S.tts(user, text, false, 'happy', 0.92, 'opus', voice, style);
-  const fd = new FormData(); fd.append('chat_id', String(chatId)); fd.append('voice', new Blob([ogg], { type: 'audio/ogg' }), 'q.ogg');
-  await fetch(API + 'sendVoice', { method: 'POST', body: fd });
+  await sendVoiceFile(chatId, ogg, 'q.ogg');
 }
-async function reminderTick(testHour) {
-  const hour = testHour == null ? tashHour() : testHour, day = S.today(), slot = day + '-' + String(hour).padStart(2, '0');
-  if (!db.HOURS.includes(hour)) return;
-  for (const row of db.remindTargets(hour, slot)) {
-    db.markReminded(row.id, slot);
-    /* they are practising right now: don't interrupt */
-    if (row.last_active && Date.now() - new Date(row.last_active.replace(' ', 'T') + 'Z').getTime() < 60 * 60000) continue;
-    let st = {}; try { st = JSON.parse(row.json || '{}'); } catch (e) {}
-    const s = streak(st), dw = dueWords(st).length;
-    const qi = (Number(day.replace(/-/g, '')) + hour + row.id) % DAILY_Q.length, [en, uz] = DAILY_Q[qi];
-    const mis = (st.mistakes || []).filter((m) => (m.ok || 0) < 2);
-    const one = mis.length ? mis[(qi + hour) % mis.length] : null;
-    let text = (s >= 2 ? `🔥 ${s} kunlik seriya! ` : '') + `🗣 <b>${esc(en)}</b>\n<tg-spoiler>${esc(uz)}</tg-spoiler>\n\nOvozli xabar bilan inglizcha javob bering. Xatolaringizni o'zbekcha tushuntirib beraman.`;
-    if (one) text += `\n\n🔁 <i>Esingizdami?</i> ${one.said ? '<s>' + esc(one.said) + '</s> → ' : ''}<b>${esc(one.better)}</b>`;
-    if (dw) text += `\n📚 ${dw} ta so'z takrorlashni kutyapti.`;
-    text += '\n\n/remind — eslatma soatlari';
-    try {
-      await say(row.chat_id, text, { reply_markup: { inline_keyboard: [[appBtn('🗣 Mini Appda gaplashish')], [appBtn2("📚 So'zlar va xatolar", 'words')]] } });
-      const ch = (st.settings && st.settings.char) || {};
-      sendVoiceText(row.chat_id, db.getUser(row.id), en, S.prompts.voiceFor(ch.id, st.settings && st.settings.gender), st.settings && st.settings.style).catch(() => {});
-      /* the question becomes the start of the bot conversation, so the reply continues it */
-      const fresh = db.getState(row.id);
-      fresh.botTurns = (fresh.botTurns || []).concat([{ role: 'assistant', content: JSON.stringify({ emotion: 'happy', reply: en }) }]).slice(-10);
-      db.putState(row.id, fresh);
-    } catch (e) { if (/blocked|deactivated|not found/i.test(e.message)) db.setRemind(row.id, false); }
-    await new Promise((r) => setTimeout(r, 60)); /* stay well under Telegram's sending limits */
+/* Each chosen hour is either word time or speaking practice (they alternate: morning words, midday speaking, evening words). */
+function remindKind(hours, h, st) {
+  const i = Math.max(0, hours.indexOf(h));
+  const words = (st.words || []).filter((w) => w && w.uz && w.src !== 'pattern');
+  return i % 2 === 0 && words.length ? 'words' : 'talk';
+}
+async function remindOne(row, hour, day) {
+  let st = {}; try { st = JSON.parse(row.json || '{}'); } catch (e) {}
+  const hours = String(row.remind_hours || '').split(',').map(Number);
+  const kind = remindKind(hours, hour, st);
+  const s = streak(st), dw = dueWords(st).length;
+  const user = db.getUser(row.id);
+  const kb = { inline_keyboard: [[appBtn('🗣 Mini Appda gaplashish')], [appBtn2("📚 So'zlar va xatolar", 'words')]] };
+  const fire = s >= 2 ? `🔥 ${s} kunlik seriya! ` : '';
+  if (kind === 'words') {
+    const tg5 = L.targets(st.words, 3).map((w) => `<b>${esc(w.w)}</b> — <tg-spoiler>${esc(w.uz)}</tg-spoiler>`);
+    const intro = `⏰ ${fire}<b>So'z yodlash vaqti!</b>` + (dw ? `\n📚 Bugun ${dw} ta so'z takrorlashni kutyapti.` : '') + (tg5.length ? `\n\n🎯 Bugun suhbatda ishlatib ko'ring:\n${tg5.join('\n')}` : '') + '\n\n2 daqiqalik test, boshladik:';
+    if (await startReview(row.chat_id, user, intro)) return 'words';
   }
+  const qi = (Number(day.replace(/-/g, '')) + hour + row.id) % DAILY_Q.length, [en, uz] = DAILY_Q[qi];
+  const mis = (st.mistakes || []).filter((m) => (m.ok || 0) < 2);
+  const one = mis.length ? mis[(qi + hour) % mis.length] : null;
+  const tgt = L.targets(st.words, 2);
+  let text = `⏰ ${fire}<b>Gapirish mashqi vaqti!</b>\n\n🗣 <b>${esc(en)}</b>\n<tg-spoiler>${esc(uz)}</tg-spoiler>\n\nOvozli xabar bilan inglizcha javob bering. Xatolaringizni o'zbekcha tushuntirib beraman.`;
+  if (tgt.length) text += `\n🎯 Javobda shu so'zlarni ishlating: <b>${tgt.map((w) => esc(w.w)).join(', ')}</b>`;
+  if (one) text += `\n\n🔁 <i>Esingizdami?</i> ${one.said ? '<s>' + esc(one.said) + '</s> → ' : ''}<b>${esc(one.better)}</b>`;
+  const lastTest = (st.tests || []).slice(-1)[0];
+  if ((!lastTest || lastTest.day < addDaysT(-30)) && Object.keys(st.days || {}).length >= 3) text += "\n\n📈 Oylik gapirish testi vaqti keldi: Mini Appda «Sozlamalar → Gapirish testi».";
+  text += '\n\n/remind — eslatma soatlari';
+  await say(row.chat_id, text, { reply_markup: kb });
+  const ch = (st.settings && st.settings.char) || {};
+  sendVoiceText(row.chat_id, user, en, S.prompts.voiceFor(ch.id, st.settings && st.settings.gender), st.settings && st.settings.style).catch(() => {});
+  /* the question becomes the start of the bot conversation, so the reply continues it */
+  const fresh = db.getState(row.id);
+  fresh.botTurns = (fresh.botTurns || []).concat([{ role: 'assistant', content: JSON.stringify({ emotion: 'happy', reply: en }) }]).slice(-10);
+  db.putState(row.id, fresh);
+  return 'talk';
+}
+const addDaysT = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return dayKey(d); };
+let ticking = false;
+async function reminderTick(testHour) {
+  if (ticking) return; ticking = true;
+  try {
+    const hour = testHour == null ? tashHour() : testHour, day = S.today();
+    /* the server may have been asleep or restarting at the exact hour: an hour late is still fine */
+    const done = new Set();
+    for (const h of [hour, hour - 1]) {
+      if (!db.HOURS.includes(h)) continue;
+      const slot = day + '-' + String(h).padStart(2, '0');
+      for (const row of db.remindTargets(h, slot)) {
+        db.markReminded(row.id, slot);
+        if (done.has(row.id)) continue; done.add(row.id);
+        if (h !== hour && String(',' + row.remind_hours + ',').includes(',' + hour + ',')) continue; /* the current hour's reminder comes anyway */
+        /* they are practising right now: don't interrupt */
+        if (row.last_active && Date.now() - new Date(row.last_active.replace(' ', 'T') + 'Z').getTime() < 30 * 60000) continue;
+        try { await remindOne(row, h, day); }
+        catch (e) { if (/blocked|deactivated|not found/i.test(e.message)) db.setRemind(row.id, false); else console.error('remind:', String(e.message).slice(0, 120)); }
+        await new Promise((r) => setTimeout(r, 60)); /* stay well under Telegram's sending limits */
+      }
+    }
+    await weekly(hour, day);
+    if (hour === 8) db.cleanSent(day.slice(0, 8) + '00');
+  } finally { ticking = false; }
+}
+async function weekly(hour, day) {
   /* Sunday 20:00: weekly report to everyone who keeps reminders on */
   const dow = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tashkent', weekday: 'short' }).format(new Date());
   if (dow === 'Sun' && hour === 20) {
@@ -397,7 +502,6 @@ async function reminderTick(testHour) {
       await new Promise((r) => setTimeout(r, 60));
     }
   }
-  if (hour === 8) db.cleanSent(day.slice(0, 8) + '00');
 }
 
 /* ---------- setup ---------- */
@@ -405,10 +509,14 @@ async function setup({ publicUrl, secret, polling }) {
   appUrl = publicUrl;
   await tg('setMyCommands', { commands: [
     { command: 'start', description: 'Boshlash' }, { command: 'stats', description: 'Natijalarim' },
-    { command: 'words', description: "Takrorlash uchun so'zlar" }, { command: 'premium', description: 'Premium (Stars)' },
+    { command: 'review', description: "So'z yodlash (tugmali test)" }, { command: 'words', description: "Takrorlash uchun so'zlar" }, { command: 'premium', description: 'Premium (Stars)' },
     { command: 'remind', description: 'Eslatma soatlari' }, { command: 'name', description: 'Hamrohga ism berish' }, { command: 'settings', description: 'Javob tili va ovoz (ayol/erkak)' }, { command: 'report', description: 'Haftalik hisobot' }, { command: 'about', description: "O'zim haqimda (suhbat shunga moslashadi)" }, { command: 'help', description: 'Yordam' }] });
   if (appUrl) await tg('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Gaplashish', web_app: { url: appUrl + '/' } } });
   setInterval(() => reminderTick().catch((e) => console.error('remind', e.message)), 5 * 60000).unref();
+  setTimeout(() => reminderTick().catch((e) => console.error('remind', e.message)), 20000).unref();
+  /* Railway's free plan puts a service to sleep after 10 minutes without outgoing traffic, and a
+     sleeping server cannot send reminders. A tiny request every 4 minutes keeps it awake (KEEP_AWAKE=0 turns this off). */
+  if (process.env.RAILWAY_ENVIRONMENT && process.env.KEEP_AWAKE !== '0') setInterval(() => tg('getMe', {}).catch(() => {}), 4 * 60000).unref();
   if (polling) {
     await tg('deleteWebhook', {});
     let offset = 0, lastErr = '', lastAt = 0;
@@ -428,7 +536,7 @@ async function setup({ publicUrl, secret, polling }) {
     })();
     console.log('bot: long polling');
   } else {
-    await tg('setWebhook', { url: appUrl + '/tg/webhook', secret_token: secret, allowed_updates: ['message', 'pre_checkout_query', 'callback_query'], drop_pending_updates: true });
+    await tg('setWebhook', { url: appUrl + '/tg/webhook', secret_token: secret, allowed_updates: ['message', 'pre_checkout_query', 'callback_query'], drop_pending_updates: false });
     console.log('bot: webhook set');
   }
 }

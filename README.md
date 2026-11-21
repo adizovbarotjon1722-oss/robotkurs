@@ -98,6 +98,13 @@ So'zlar bo'limida **3000 so'z kursi** bor: eng ko'p ishlatiladigan 3076 ta so'z 
 - "Yozish" rejimi: o'zbekcha ma'no va bo'sh joyli misol gap ko'rsatiladi, inglizchasini yozasiz (1 harf xato "deyarli" deb qabul qilinadi).
 - **Gap qoliplari**: 12 mavzuda 109 ta eng kerakli qolip (Could you ...? / I've been ...ing for ... va h.k.), o'zbekcha ma'nosi va misol tarjimasi bilan.
 
+## So'zlar suhbatda, Telegram'da test, eslatmalar va oylik test
+- **Bugungi so'zlar suhbatda**: Gaplashish oynasida "🎯 Bugun ishlating" qatori bor (takrorlanadigan so'zlar). Hamroh ularni suhbatda ishlatadi va sizni ham ishlatishga undaydi. So'zni to'g'ri ishlatsangiz (AI tekshiradi), u "yodlandi" deb keyingi bosqichga o'tadi. Botdagi suhbatda ham shunday.
+- **Telegram'da tugmali takrorlash**: `/review` (yoki `/takror`) 5 ta savol: so'z va 4 ta javob varianti. Natija Mini App bilan bir xil saqlanadi.
+- **Kuniga 3 ta eslatma** (standart 09:00, 15:00, 20:00, Toshkent vaqti; `/remind` bilan o'zgartiriladi): navbat bilan so'z yodlash vaqti (test darhol boshlanadi), gapirish mashqi vaqti (savol + ovozli javob), yana so'z yodlash. Siz o'sha paytda ilovada bo'lsangiz, bezovta qilmaydi. Server uxlab qolib soatni o'tkazib yuborsa, bir soat ichida yuboradi.
+- **Railway bepul rejasida** xizmat 10 daqiqa jim tursa uxlaydi va eslatma yubora olmaydi. Shuning uchun server har 4 daqiqada Telegram'ga kichik so'rov yuborib, uyg'oq turadi (biroz ko'proq resurs sarflaydi). O'chirish: Railway Variables'ga `KEEP_AWAKE=0`.
+- **Oylik gapirish testi**: Sozlamalar → "📈 Gapirish testi". 5 ta savolga ovoz bilan javob berasiz; AI darajangizni (A1–C2), 100 ballik baho, ravonlik, grammatika, so'z boyligi va bog'lanish ballarini, shu oy nimaga e'tibor berishni aytadi. Natijalar saqlanadi va o'tgan oy bilan solishtiriladi.
+
 ## Ish va sayohat uchun
 - **Muhandis ishi (10 ta rol o'yini):** stand-up yig'ilish, texnik muammoni tushuntirish, obyektda xorijlik hamkasb, loyiha taqdimoti, muddat kelishuvi, ta'minotchi bilan qo'ng'iroq, chizmani tasvirlash, xavfsizlik brifingi, muhandis intervyusi, hamkasb bilan small talk.
 - **Sayohat (9 ta):** aeroport, mehmonxona, taksi, chipta, yo'qolgan bagaj, dorixona, ekskursiya, kafe, yo'l so'rash.
@@ -142,6 +149,14 @@ Telegram Mini Appni faqat https manzildan ochadi. Kompyuterda bepul Cloudflare t
 2. `npm run dev`. Server tunnelni o'zi ishga tushiradi va terminalda `Mini App manzili: https://...trycloudflare.com` chiqadi.
 3. Telegramda botni oching, pastdagi "Gaplashish" tugmasini bosing.
 Manzil har safar yangilanadi, bot uni o'zi yangilaydi. Kompyuter o'chsa, Mini App ham ishlamaydi. Doimiy ishlashi uchun Railway'ga joylang.
+
+## Xavfsizlik va tezlik (2026-11-21 tekshiruvi)
+- Mini App sahifasi siqilgan holda yuboriladi (377 KB o'rniga ~113 KB) va telefon o'z nusxasidan qayta foydalanadi (ETag).
+- IP bo'yicha cheklov endi proksi qo'shgan haqiqiy manzilni oladi (mijoz soxta `X-Forwarded-For` bilan aylanib o'ta olmaydi).
+- Botda har bir foydalanuvchiga daqiqasiga 20 ta xabar / 40 ta tugma bosish cheklovi.
+- Telegram'ga so'rovlar 20 soniyada uziladi (osilib qolmaydi).
+- Server qayta ishga tushganda Telegram'dagi kutib turgan xabarlar endi o'chirilmaydi (uxlab qolgan serverni uyg'otgan birinchi xabar yo'qolmaydi).
+- Bot va Mini App bir vaqtda so'zni baholasa, eng yangi natija saqlanadi (avval Mini App botning natijasini ustidan yozib yuborardi).
 
 ## Ma'lumotlar xavfsizligi (baza)
 - **Har kuni zaxira nusxa:** `server/data/backups/` papkasida bazaning kunlik nusxasi saqlanadi, oxirgi 7 kunniki qoladi. Biror narsa buzilsa, `qumri.db` o'rniga kerakli kunning nusxasini qo'ying.

@@ -11,7 +11,7 @@ const SERVER = !!TG;
 const inViewer = !TG && !!(window.claude && window.claude.use);
 
 /* ================= storage (+ server sync inside Telegram) ================= */
-const SYNC_KEYS = ['words','days','settings','lastDay','chat','mistakes','flu'];
+const SYNC_KEYS = ['words','days','settings','lastDay','chat','mistakes','flu','tests'];
 let syncT = null, syncBase = 0, synced = false;
 const LS = {
   get(k, d){ try { const v = localStorage.getItem('qumri_'+k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
@@ -31,7 +31,7 @@ if (!P.pick(P.STYLES, settings.style)) settings.style = 'samimiy';
 if (!P.pick(P.TOPICS, settings.topic)) settings.topic = 'free';
 const styleDef = () => P.pick(P.STYLES, settings.style, P.STYLES.samimiy);
 const saveSettings = () => LS.set('settings', settings);
-let words = LS.get('words', []), days = LS.get('days', {}), chat = LS.get('chat', []), mistakes = LS.get('mistakes', []), flu = LS.get('flu', {});
+let words = LS.get('words', []), days = LS.get('days', {}), chat = LS.get('chat', []), mistakes = LS.get('mistakes', []), flu = LS.get('flu', {}), tests = LS.get('tests', []);
 const applyCalm = () => document.documentElement.classList.toggle('calm', settings.calm !== false);
 applyCalm();
 
@@ -492,10 +492,10 @@ function startTalk(newChat){
   feed.innerHTML = ''; turns = [];
   if (!newChat && chat.length){
     chat.slice(-12).forEach(t => { turns.push(t); if (t.role === 'user') addMsg('me', t.content); else { const r = parseJSON(t.content, { reply:t.content }); addMsg('q', r.reply); lastQ = r; } });
-    setEmo('happy'); status('', 'Davom etamiz! Tugmani bosing.'); return;
+    setEmo('happy'); status('', 'Davom etamiz! Tugmani bosing.'); renderTargets(); return;
   }
   const g = greet(); turns.push({ role:'assistant', content: JSON.stringify({ emotion:g.emotion, reply:g.reply }) }); saveChat();
-  qMsg(g); emote(g.emotion); status('', micBlocked ? 'Javob yozing' : 'Tugmani bosing va javob bering');
+  qMsg(g); emote(g.emotion); status('', micBlocked ? 'Javob yozing' : 'Tugmani bosing va javob bering'); renderTargets();
   if (!settings.char.name && !LS.get('named', false)) nameCard();
 }
 function saveChat(){ chat = turns.slice(-30); LS.set('chat', chat); }
@@ -534,11 +534,31 @@ function openTopics(){
   });
   $('topicSheet').classList.add('open');
 }
-function learningWords(){ return words.filter(w => w.box >= 1 && w.box <= 3).sort((a,b) => a.box - b.box).slice(0,4).map(w => w.w); }
-function usedLearning(text){
-  const t = ' ' + text.toLowerCase() + ' ', hit = [];
-  words.forEach(w => { if (w.box < 1) return; const re = new RegExp('\\b' + w.w.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b'); if (re.test(t)){ w.used = (w.used||0) + 1; hit.push(w); } });
-  if (hit.length) LS.set('words', words); return hit;
+/* today's target words for the conversation: due words first, then the ones still being learned (not used yet today) */
+function targetWords(n){
+  const t = today(), list = words.filter(w => w && w.w && (w.box||0) <= 3 && w.usedDay !== t && w.src !== 'pattern' && w.w.length <= 30);
+  const d = list.filter(w => (w.due||'') <= t).sort((a,b) => ((a.used||0) - (b.used||0)) || ((a.box||0) - (b.box||0)));
+  const rest = list.filter(w => (w.due||'') > t && (w.box||0) >= 1).sort((a,b) => (a.box||0) - (b.box||0));
+  return d.concat(rest).slice(0, n || 5);
+}
+let tgtNow = [];
+function learningWords(){ tgtNow = targetWords(5); return tgtNow.map(w => w.w); }
+const wordIn = (text, w) => new RegExp('(^|[^a-z])' + w.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '([^a-z]|$)', 'i').test(text);
+/* the AI says which target words were used correctly; a used word counts as a successful review (once a day) */
+function usedLearning(text, aiList){
+  const names = Array.isArray(aiList) ? aiList.map(x => String(x||'').toLowerCase().trim()) : null, t = today();
+  const hit = tgtNow.filter(w => wordIn(text, w.w) && (!names || names.includes(w.w.toLowerCase())) && w.usedDay !== t);
+  hit.forEach(w => { w.used = (w.used||0) + 1; w.usedDay = t; grade(w, true); });
+  if (hit.length){ LS.set('words', words); renderBadge(); }
+  return hit;
+}
+function renderTargets(){
+  const box = $('targets'); if (!box) return;
+  const list = targetWords(5), t = today(), usedToday = words.filter(w => w.usedDay === t).slice(-3);
+  box.innerHTML = ''; box.hidden = !list.length && !usedToday.length; if (box.hidden) return;
+  box.append(el('span', 'tl', '🎯 Bugun ishlating:'));
+  usedToday.forEach(w => box.append(el('span', 'tw done', '✓ ' + w.w)));
+  list.forEach(w => { const b = btn('tw', w.w, () => { status('', w.w + ' — ' + w.uz); speakParts([{ text:w.w }]); }); box.append(b); });
 }
 async function send(text, dur){
   text = (text||'').trim(); if (!text || busy) return;
@@ -561,8 +581,9 @@ async function send(text, dur){
     const keep = { emotion:r.emotion, reply:r.reply }; if (r.memo && P.TOPICS[topic].game) keep.memo = String(r.memo).slice(0, 300);
     turns.push({ role:'assistant', content: JSON.stringify(keep) }); saveChat();
     LS.set('lastDay', today());
-    const used = usedLearning(text);
-    if (used.length) r.praise_uz = (r.praise_uz ? r.praise_uz + ' ' : '') + `Yangi so'zni ishlatdingiz: ${used.map(w => w.w).join(', ')}!`;
+    const used = usedLearning(text, r.used_words);
+    if (used.length){ r.praise_uz = (r.praise_uz ? r.praise_uz + ' ' : '') + `🎯 Bugungi so'zni to'g'ri ishlatdingiz: ${used.map(w => w.w).join(', ')}! Yodlandi deb belgiladim.`; feathers($('targets'), 8); }
+    renderTargets();
     r._added = addWords(r.new_words, 'chat'); saveMistakes(tipsOf(r));
     busy = false; $('talk').classList.remove('busy');
     qMsg(r); emote(used.length ? 'proud' : r.emotion || 'happy'); speakTurn(r, true);
@@ -658,7 +679,7 @@ function grade(w, ok){
   else if (ok === 'hard'){ w.box = Math.max(1, w.box); w.due = addDays(Math.max(1, Math.floor(STEPS[w.box] / 2))); }
   else if (ok){ w.box = Math.min(STEPS.length - 1, w.box + 1); w.due = addDays(STEPS[w.box]); }
   else { w.box = Math.min(w.box, 1); w.due = today(); }
-  w.seen = (w.seen||0) + 1; LS.set('words', words); activity();
+  w.seen = (w.seen||0) + 1; w.t = Date.now(); LS.set('words', words); activity();
 }
 let wmode = 'cards', queue = [], cur = null, sessionOk = 0;
 function buildQueue(){ queue = due().sort((a,b) => (b.box - a.box) || 0).slice(0, 25); }
@@ -1062,10 +1083,10 @@ function setRoom(r){
   document.querySelectorAll('.nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.room === r));
   $('room-talk').hidden = r !== 'talk'; $('room-words').hidden = r !== 'words';
   if (r === 'words'){ stopSpeaking(); queue = []; renderWordsRoom(); }
-  else status('', micBlocked ? 'Javob yozing' : 'Tugmani bosing va gapiring');
+  else { status('', micBlocked ? 'Javob yozing' : 'Tugmani bosing va gapiring'); renderTargets(); }
 }
 document.querySelectorAll('.nav button').forEach(b => b.onclick = () => setRoom(b.dataset.room));
-function openSheet(){ renderDays(); $('sheet').classList.add('open'); }
+function openSheet(){ renderDays(); renderTestCard(); $('sheet').classList.add('open'); }
 $('openSettings').onclick = openSheet; $('streakPill').onclick = openSheet;
 $('closeSheet').onclick = () => $('sheet').classList.remove('open');
 function renderDays(){
@@ -1120,9 +1141,9 @@ async function initTelegram(){
   applyTgTheme(); TG.onEvent('themeChanged', applyTgTheme);
   $('keyBox').hidden = true;
   const back = TG.BackButton;
-  const SHEETS = ['askSheet','topicSheet','charSheet','sheet'];
+  const SHEETS = ['testSheet','askSheet','topicSheet','charSheet','sheet'];
   const sync = () => (SHEETS.some(id => $(id).classList.contains('open')) || room !== 'talk') ? back.show() : back.hide();
-  ['topicSheet','askSheet'].forEach(id => new MutationObserver(sync).observe($(id), { attributes:true, attributeFilter:['class'] }));
+  ['topicSheet','askSheet','testSheet'].forEach(id => new MutationObserver(sync).observe($(id), { attributes:true, attributeFilter:['class'] }));
   new MutationObserver(sync).observe($('charSheet'), { attributes:true, attributeFilter:['class'] });
   new MutationObserver(sync).observe($('sheet'), { attributes:true, attributeFilter:['class'] });
   document.querySelectorAll('.nav button').forEach(b => b.addEventListener('click', sync));
@@ -1130,10 +1151,10 @@ async function initTelegram(){
   try {
     const r = await api('/api/me'); const j = await r.json(); quota = j.quota; renderQuota(); renderRemind(j.remind || []); serverVoice = j.voice !== false; syncBase = +j.now || Date.now(); synced = true; if (j.admin) initAdmin();
     const s = j.state || {};
-    if (s.flu) flu = s.flu; if (s.mistakes) mistakes = s.mistakes; if (s.words) words = s.words; if (s.days) days = s.days; if (s.chat) chat = s.chat; if (s.settings){ Object.assign(settings, s.settings); applyCalm(); $('corrections').value = settings.corrections; $('ansLang').value = settings.lang || 'both'; $('about').value = settings.about || ''; $('gender').value = settings.gender || 'auto'; $('calm').checked = settings.calm === false; settings.char = Object.assign({ id:'nur', color:'', acc:'none', name:'' }, settings.char || {}); if (!P.pick(P.STYLES, settings.style)) settings.style = 'samimiy'; if (!P.pick(P.TOPICS, settings.topic)) settings.topic = 'free'; topic = settings.topic; paintChar(); CH.paint($('avatarSvg'), settings.char, true); }
+    if (s.flu) flu = s.flu; if (Array.isArray(s.tests)) tests = s.tests; if (s.mistakes) mistakes = s.mistakes; if (s.words) words = s.words; if (s.days) days = s.days; if (s.chat) chat = s.chat; if (s.settings){ Object.assign(settings, s.settings); applyCalm(); $('corrections').value = settings.corrections; $('ansLang').value = settings.lang || 'both'; $('about').value = settings.about || ''; $('gender').value = settings.gender || 'auto'; $('calm').checked = settings.calm === false; settings.char = Object.assign({ id:'nur', color:'', acc:'none', name:'' }, settings.char || {}); if (!P.pick(P.STYLES, settings.style)) settings.style = 'samimiy'; if (!P.pick(P.TOPICS, settings.topic)) settings.topic = 'free'; topic = settings.topic; paintChar(); CH.paint($('avatarSvg'), settings.char, true); }
     SYNC_KEYS.forEach(k => { if (s[k] != null) try { localStorage.setItem('qumri_'+k, JSON.stringify(s[k])); } catch(e){} });
     $('level').value = settings.level; $('goal').value = String(settings.goal); $('rate').value = String(settings.rate);
-    renderGoal(); renderBadge(); renderTopics(); startTalk(false);
+    renderGoal(); renderBadge(); renderTopics(); startTalk(false); setTimeout(testNudge, 1200);
     const start = new URLSearchParams(location.search).get('room') || (TG.initDataUnsafe && TG.initDataUnsafe.start_param);
     if (start === 'words'){ setRoom('words'); sync(); }
   } catch(e){ status('', errText(e)); }
@@ -1215,8 +1236,117 @@ async function recap(){
 $('recapBtn').onclick = recap;
 $('closeTopics').onclick = () => $('topicSheet').classList.remove('open');
 
+/* ================= monthly speaking test ================= */
+const TEST_SETS = [
+  [["Tell me about yourself: your work, your city and what you do in your free time.", "O'zingiz haqingizda gapiring: ishingiz, shahringiz, bo'sh vaqtingiz."],
+   ["What did you do last weekend? Tell me the whole story.", "O'tgan dam olish kunlari nima qildingiz? Batafsil gapiring."],
+   ["Describe a technical problem you solved at work. What did you do step by step?", "Ishda hal qilgan texnik muammoingizni tasvirlang. Qadam-baqadam nima qildingiz?"],
+   ["What are your plans for the next five years, and why?", "Keyingi besh yilga rejalaringiz qanday va nega?"],
+   ["You are at the airport and your bag is lost. Talk to the airline staff.", "Aeroportdasiz, sumkangiz yo'qoldi. Aviakompaniya xodimi bilan gaplashing."]],
+  [["Introduce yourself to a new foreign colleague.", "Yangi xorijlik hamkasbingizga o'zingizni tanishtiring."],
+   ["Tell me about the best trip you have ever had.", "Eng yaxshi sayohatingiz haqida gapirib bering."],
+   ["Explain your job to someone who knows nothing about engineering.", "Ishingizni muhandislikdan bexabar odamga tushuntiring."],
+   ["Is it better to work in a big company or a small one? Give your reasons.", "Katta kompaniyada ishlash yaxshimi yoki kichigidami? Sabablarini ayting."],
+   ["You booked a hotel room but they say there is no booking. What do you say?", "Mehmonxonada xona band qilgansiz, ular bron yo'q deyishyapti. Nima deysiz?"]],
+  [["What does a normal working day look like for you?", "Oddiy ish kuningiz qanday o'tadi?"],
+   ["Tell me about a mistake you made and what you learned from it.", "Qilgan bir xatoingiz va undan nima o'rganganingiz haqida gapiring."],
+   ["Describe a project you are proud of. What was your role?", "Faxrlanadigan loyihangizni tasvirlang. Sizning rolingiz nima edi?"],
+   ["How will technology change our lives in the next ten years?", "Texnologiya keyingi o'n yilda hayotimizni qanday o'zgartiradi?"],
+   ["You need to ask your manager for a day off next week. Ask politely.", "Keyingi haftaga rahbaringizdan bir kunlik javob so'rashingiz kerak. Xushmuomala so'rang."]]
+];
+let T = null; /* running test: { set, i, answers:[{q,a,sec}] } */
+const monthAgo = () => addDays(-30);
+const testDue = () => !tests.length || tests[tests.length - 1].day < monthAgo();
+function renderTestCard(){
+  const box = $('testCard'); if (!box) return; box.innerHTML = '';
+  const last = tests[tests.length - 1], prev = tests[tests.length - 2];
+  if (last){
+    const r = el('div', 'tres');
+    r.append(el('div', 'tlv', last.level), el('div', null, `${last.day} · ${last.score}/100` + (last.wpm ? ` · ${last.wpm} so'z/daqiqa` : '')));
+    if (prev){ const d = last.score - prev.score; r.append(el('div', d >= 0 ? 'good' : 'bad', (d >= 0 ? '⬆️ +' : '⬇️ ') + d + ` (o'tgan safar ${prev.level}, ${prev.score})`)); }
+    box.append(r);
+    if (tests.length > 1){ const h = el('div', 'thist'); tests.slice(-6).forEach(x => { const c = el('i'); c.style.height = Math.max(6, x.score * 0.5) + 'px'; c.title = x.day + ': ' + x.level + ' ' + x.score; h.append(c); }); box.append(h); }
+  }
+  box.append(el('p', 'note', testDue() ? "5 ta savolga ovoz bilan javob berasiz (har biriga 1 daqiqacha). Darajangiz (A1–C2), ballar va shu oy nimaga e'tibor berish kerakligi chiqadi. Har oy takrorlab, o'sishingizni ko'rasiz." : `Keyingi test: ${addDaysFrom(last.day, 30)} dan keyin. Hozir ham topshirishingiz mumkin.`));
+  box.append(btn('btn primary', testDue() ? 'Testni boshlash' : 'Yana topshirish', startTest));
+}
+function addDaysFrom(day, n){ const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+function startTest(){
+  $('sheet').classList.remove('open'); stopListen(); stopSpeaking();
+  T = { set: TEST_SETS[(new Date().getMonth()) % TEST_SETS.length], i: 0, answers: [] };
+  $('testSheet').classList.add('open'); testStep();
+}
+function testStep(){
+  const box = $('testBody'); box.innerHTML = '';
+  const [en, uz] = T.set[T.i];
+  T.cur = T.answers[T.i] || { q: en, a: '', sec: 0 };
+  box.append(el('div', 'tstep', `Savol ${T.i + 1}/${T.set.length}`), el('div', 'tq', en), el('div', 'tquz', uz));
+  const ans = el('textarea'); ans.rows = 4; ans.maxLength = 1500; ans.placeholder = "Mikrofonni bosib gapiring (yoki yozing). To'xtab qolsangiz, yana bosing: davomi qo'shiladi."; ans.value = T.cur.a;
+  ans.oninput = () => { T.cur.a = ans.value; };
+  const mic = btn('btn primary', '🎙 Javob berish', () => {
+    if (listening){ stopListen(); return; }
+    mic.classList.add('on'); mic.textContent = '⏹ Tugatish';
+    const ok = startListen({ lang:'en', silent:true,
+      onDone: (t, c, d) => { mic.classList.remove('on'); mic.textContent = '🎙 Davom ettirish'; T.cur.a = (T.cur.a ? T.cur.a + ' ' : '') + t; T.cur.sec += +d || Math.max(2, t.split(/\s+/).length / 2); ans.value = T.cur.a; },
+      onEmpty: () => { mic.classList.remove('on'); mic.textContent = '🎙 Javob berish'; status('', "Eshitmadim, yana bosing."); } });
+    if (!ok){ mic.classList.remove('on'); mic.textContent = '🎙 Javob berish'; }
+  });
+  const row = el('div', 'trow2');
+  row.append(btn('btn', '🔊', () => speakParts([{ text: en }])), mic, btn('btn', T.i + 1 < T.set.length ? 'Keyingisi →' : 'Baholash ✓', () => {
+    T.cur.a = ans.value.trim();
+    if (T.cur.a.split(/\s+/).filter(Boolean).length < 3){ status('', "Kamida bir-ikki gap ayting."); ans.focus(); return; }
+    if (!T.cur.sec) T.cur.sec = Math.max(5, T.cur.a.split(/\s+/).length / 1.6);
+    T.answers[T.i] = T.cur; T.i++;
+    if (T.i < T.set.length) testStep(); else gradeTest();
+  }));
+  box.append(ans, row);
+  speakParts([{ text: en }]);
+}
+async function gradeTest(){
+  const box = $('testBody'); box.innerHTML = ''; box.append(el('div', 'tstep', 'Baholanmoqda… (20 soniyagacha)'));
+  const nw = T.answers.reduce((a, x) => a + x.a.split(/\s+/).filter(Boolean).length, 0), secs = T.answers.reduce((a, x) => a + (x.sec || 0), 0);
+  const wpm = secs >= 20 ? Math.round(nw / (secs / 60)) : 0;
+  try {
+    const r = parseJSON(await ai('test', { level: settings.level, answers: T.answers }), null);
+    if (!r || !r.level) throw new Error('bad');
+    const n = (v, a, b) => Math.max(a, Math.min(b, Math.round(+v || 0)));
+    const res = { day: today(), at: Date.now(), level: String(r.level).toUpperCase().slice(0, 2), score: n(r.score, 0, 100), f: n(r.fluency, 0, 10), g: n(r.grammar, 0, 10), v: n(r.vocab, 0, 10), c: n(r.coherence, 0, 10), wpm, words: nw };
+    const prev = tests[tests.length - 1];
+    tests = tests.concat([res]).slice(-24); LS.set('tests', tests);
+    saveMistakes((Array.isArray(r.fix) ? r.fix : []).filter(x => x && x.better).map(x => ({ said:x.said, better:String(x.better), uz:x.uz })));
+    box.innerHTML = '';
+    const c = el('div', 'recap');
+    c.append(el('div', 'k', 'Gapirish testi natijasi'), el('div', 'tbig', res.level + ' · ' + res.score + '/100'));
+    if (prev) c.append(el('div', res.score >= prev.score ? 'good' : 'bad', (res.score >= prev.score ? '⬆️ +' : '⬇️ ') + (res.score - prev.score) + ` ball (${prev.day}: ${prev.level}, ${prev.score})`));
+    const bars = el('div', 'tbars');
+    [['Ravonlik', res.f], ['Grammatika', res.g], ["So'z boyligi", res.v], ['Bog\'lanish', res.c]].forEach(([k, v]) => { const b = el('div', 'tbar'); b.append(el('span', null, k), el('i'), el('b', null, v + '/10')); b.querySelector('i').style.setProperty('--w', v * 10 + '%'); bars.append(b); });
+    c.append(bars);
+    if (wpm) c.append(el('div', 'note', `Gapirish tezligi: ${wpm} so'z/daqiqa · jami ${nw} so'z`));
+    if (r.summary_uz) c.append(el('p', null, r.summary_uz));
+    const list = (title, items, fn) => { items = (Array.isArray(items) ? items : []).slice(0, 4).filter(Boolean); if (!items.length) return; c.append(el('div','rh', title)); const ul = el('ul'); items.forEach(x => ul.append(fn(x))); c.append(ul); };
+    list("Kuchli tomonlar", r.strengths, x => el('li', 'good', String(x)));
+    list("Shu oy ustida ishlang", r.improve, x => el('li', null, String(x)));
+    list("Xatolar (daftarga qo'shildi)", r.fix, x => { const li = el('li'); if (x.said) li.append(el('s', null, x.said), document.createTextNode(' → ')); li.append(el('b', null, x.better || '')); if (x.uz) li.append(el('div','tuz', x.uz)); return li; });
+    if (r.next_uz) c.append(el('div', 'next', '🗓 ' + r.next_uz));
+    box.append(c, btn('btn primary', 'Yopish', () => $('testSheet').classList.remove('open')));
+    emote(prev && res.score > prev.score ? 'proud' : 'happy'); if (prev && res.score > prev.score) feathers(c, 12);
+    speakParts([{ text: r.summary_uz || '', uz:true }]);
+    T = null;
+  } catch(e){
+    box.innerHTML = ''; box.append(el('p', 'bad', e.code ? errText(e) : "Baholab bo'lmadi. Javoblaringiz saqlangan, qayta urinib ko'ring."), btn('btn primary', 'Qayta baholash', gradeTest));
+  }
+}
+$('closeTest').onclick = () => { stopListen(); $('testSheet').classList.remove('open'); };
+/* once a month, a gentle note in the chat */
+function testNudge(){
+  if (!testDue() || Object.keys(days).length < 3 || LS.get('testNudge', '') === today()) return;
+  LS.set('testNudge', today());
+  const m = addMsg('q', "📈 Oylik gapirish testi vaqti keldi! 5 ta savol, 5 daqiqa. Darajangizni va o'tgan oyga nisbatan o'sishingizni ko'rsataman.");
+  m.append(btn('btn primary', 'Testni boshlash', startTest));
+}
+
 /* ================= start ================= */
-renderTopics(); renderGoal(); renderBadge(); startTalk(false);
+renderTopics(); renderGoal(); renderBadge(); startTalk(false); if (!TG) setTimeout(testNudge, 1500);
 if (inViewer) $('viewerNote').hidden = false;
 if (TG) initTelegram();
 /* ================= owner panel: AI keys (server checks ADMIN_IDS again) ================= */

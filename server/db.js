@@ -27,10 +27,12 @@ CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT, updated TEXT DEFAULT 
 /* reminder hours (Tashkent), comma separated; added after the first release */
 try { db.exec("ALTER TABLE users ADD COLUMN remind_hours TEXT DEFAULT '9,20'"); } catch (e) { /* already there */ }
 const HOURS = [8, 9, 12, 15, 18, 20, 22];
+/* three reminders a day is the default now (words, speaking, words); move people who still had the old default */
+try { if (!db.prepare("SELECT v FROM kv WHERE k = 'mig:hours3'").get()) { db.exec("UPDATE users SET remind_hours = '9,15,20' WHERE remind_hours = '9,20'"); db.exec("INSERT INTO kv (k, v) VALUES ('mig:hours3', '1')"); } } catch (e) { console.error('migration:', e.message); }
 const parseHours = (s) => [...new Set(String(s || '').split(',').map(Number).filter((h) => HOURS.includes(h)))].sort((a, b) => a - b);
 
 const st = {
-  upsertUser: db.prepare(`INSERT INTO users (id, first_name, lang, last_active, chat_id) VALUES (?, ?, ?, datetime('now'), ?)
+  upsertUser: db.prepare(`INSERT INTO users (id, first_name, lang, last_active, chat_id, remind_hours) VALUES (?, ?, ?, datetime('now'), ?, '9,15,20')
     ON CONFLICT(id) DO UPDATE SET first_name = excluded.first_name, lang = excluded.lang, last_active = datetime('now'),
     chat_id = COALESCE(excluded.chat_id, users.chat_id)`),
   getUser: db.prepare('SELECT * FROM users WHERE id = ?'),
