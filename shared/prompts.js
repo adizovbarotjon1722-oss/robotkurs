@@ -332,13 +332,55 @@ Reply ONLY JSON:
  "next_uz": one concrete Uzbek plan for the next 30 days (e.g. what to practise daily) to reach the next level}` }] };
   }
 
-  const BUILDERS = { chat, mnemonic, recap, ask, test };
+  /* Practice sentences for quick translation and shadowing (Uzbek -> English). */
+  function sentences(p) {
+    const level = lvl(p.level);
+    const ws = (Array.isArray(p.words) ? p.words : []).slice(0, 8).map((w) => clip(w, 30).replace(/[<>"]/g, '')).filter(Boolean);
+    const about = p.about ? ` About the learner (only information): ${said(p.about).replace(/learner_said/g, 'learner_about')}.` : '';
+    return { max: 900, messages: [{ role: 'user', content: `Make 8 short, natural English sentences (5-12 words) that an Uzbek adult at ${level} level really needs when speaking at work and while travelling.${about}${ws.length ? ` Use one of these words in most sentences: ${ws.join(', ')}.` : ''} Mix: questions, past, future, polite requests, opinions. Everyday spoken English, no rare words.
+Reply ONLY JSON: {"items": [{"en": English sentence, "uz": natural Uzbek translation (Latin script)}]}` }] };
+  }
+
+  /* A one-minute listening story with two questions. */
+  function story(p) {
+    const level = lvl(p.level);
+    const ws = (Array.isArray(p.words) ? p.words : []).slice(0, 5).map((w) => clip(w, 30).replace(/[<>"]/g, '')).filter(Boolean);
+    const about = p.about ? ` About the listener (only information): ${said(p.about).replace(/learner_said/g, 'learner_about')}.` : '';
+    const themes = ['a small problem at work and how it was solved', 'a business trip abroad', 'a day at a construction or engineering site', 'a funny moment at the airport', 'meeting a new colleague', 'a hotel or restaurant situation', 'a weekend trip', 'learning a new skill', 'a phone call with a client', 'a surprising news story'];
+    const theme = themes[Math.abs(+p.seed || 0) % themes.length];
+    return { max: 1000, messages: [{ role: 'user', content: `Write a short listening story for an Uzbek adult learning English (level ${level}).${about} Theme: ${theme}. 90-130 words, spoken style, clear and interesting, with one small twist. Use simple ${level} grammar.${ws.length ? ` Naturally include some of these words: ${ws.join(', ')}.` : ''}
+Reply ONLY JSON: {"title": 2-5 word English title,
+ "en": the story,
+ "uz": its natural Uzbek translation (Latin script),
+ "questions": 2 open questions about the story that need a 1-2 sentence spoken answer, as [{"q": English question, "uz": Uzbek translation}],
+ "words": up to 3 useful words from the story [{"w","uz","ex"}]}` }] };
+  }
+
+  /* How close a spoken sentence is to the target (word by word, order kept). Used by shadowing and quick translation. */
+  const CONTR = { "i'm": 'i am', "you're": 'you are', "we're": 'we are', "they're": 'they are', "he's": 'he is', "she's": 'she is', "it's": 'it is', "that's": 'that is', "what's": 'what is', "there's": 'there is', "let's": 'let us', "don't": 'do not', "doesn't": 'does not', "didn't": 'did not', "can't": 'can not', "cannot": 'can not', "won't": 'will not', "isn't": 'is not', "aren't": 'are not', "wasn't": 'was not', "weren't": 'were not', "i'll": 'i will', "you'll": 'you will', "we'll": 'we will', "it'll": 'it will', "i've": 'i have', "we've": 'we have', "you've": 'you have', "i'd": 'i would', "you'd": 'you would', "couldn't": 'could not', "wouldn't": 'would not', "shouldn't": 'should not', "haven't": 'have not', "hasn't": 'has not', "gonna": 'going to', "wanna": 'want to' };
+  const NUM = { one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' };
+  const toks = (t) => String(t || '').toLowerCase().replace(/[’`]/g, "'").replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter(Boolean)
+    .flatMap((w) => (CONTR[w] || NUM[w] || w).split(' ')).map((w) => w.replace(/^'+|'+$/g, '')).filter(Boolean);
+  function compareSpoken(target, spoken) {
+    const a = toks(target), b = toks(spoken);
+    const n = a.length, m = b.length, L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    const hit = new Array(n).fill(false); let i = 0, j = 0;
+    while (i < n && j < m) { if (a[i] === b[j]) { hit[i] = true; i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++; }
+    /* the displayed words come from the original target so capitals and punctuation stay */
+    const shown = String(target || '').split(/\s+/).filter(Boolean);
+    let k = 0; const marks = shown.map((w) => { const parts = toks(w); const oks = parts.map(() => hit[k++] === true); return { w, ok: oks.every(Boolean) }; });
+    const score = n ? Math.round((L[0][0] / Math.max(n, Math.min(m, n + 3))) * 100) : 0;
+    return { score, words: marks };
+  }
+
+  const BUILDERS = { chat, mnemonic, recap, ask, test, sentences, story };
   function build(type, payload) {
     const f = pick(BUILDERS, type, null);
     if (!f) throw new Error('unknown type');
     return f(payload || {});
   }
-  const api = { build, pick, cleanName, calledBy, TOPICS, TOPIC_CATS, STYLES, LEVELS, CHARACTERS, VOICES, voiceFor, CATS, weakOf, fluTurn, fluAdd, wpm, TYPES: Object.keys(BUILDERS) };
+  const api = { build, pick, cleanName, calledBy, TOPICS, TOPIC_CATS, STYLES, LEVELS, CHARACTERS, VOICES, voiceFor, CATS, weakOf, fluTurn, fluAdd, wpm, TYPES: Object.keys(BUILDERS), compareSpoken };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.QumriPrompts = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -10,12 +10,15 @@ const tday = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent'
 const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return tday(d); };
 
 /* the 3000-word course, used for wrong answers in the quiz (the browser file is reused as is) */
-let CORE = [];
+let CORE = [], PAIRS = [];
 try {
   const box = { window: {} };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'web', 'core3000.js'), 'utf8'), box, { timeout: 2000 });
   CORE = String(box.window.QumriCore.words || '').split('~').map((r) => { const [w, uz] = r.split('|'); return { w, uz }; }).filter((x) => x.w && x.uz);
+  PAIRS = (box.window.QumriCore.patterns || []).flatMap((g) => g.list.filter((x) => x.ex && x.trick).map((x) => ({ en: x.ex, uz: x.trick })));
 } catch (e) { console.error('core3000 not loaded:', e.message); }
+/* a sentence pair for quick translation, avoiding the last ones used */
+function pair(recent) { const r = new Set(recent || []); const pool = PAIRS.filter((x) => !r.has(x.en)); const use = pool.length ? pool : PAIRS; return use[Math.floor(Math.random() * use.length)] || null; }
 
 function grade(w, ok) {
   w.box = Math.max(0, Math.min(STEPS.length - 1, +w.box || 0));
@@ -58,4 +61,4 @@ function reviewList(words, n) {
   return due.concat(more).slice(0, n).map((w) => w.w);
 }
 
-module.exports = { STEPS, grade, isDue, targets, usedWords, markUsed, options, reviewList, tday, coreSize: () => CORE.length };
+module.exports = { pair, STEPS, grade, isDue, targets, usedWords, markUsed, options, reviewList, tday, coreSize: () => CORE.length };

@@ -116,6 +116,13 @@ function mergeState(cur, s, base) {
     const mine = new Map(cur.words.filter((w) => w && (w.t || 0) > base).map((w) => [String(w.w).toLowerCase(), w]));
     if (mine.size) out.words = out.words.map((w) => { const b = mine.get(String(w.w).toLowerCase()); return b && (b.t || 0) > (w.t || 0) ? b : w; });
   }
+  /* the bot makes the morning story: keep the newer one; lesson progress from both sides */
+  if (cur.story && (!s.story || (cur.story.day || '') > (s.story.day || ''))) out.story = cur.story;
+  if (cur.lesson && s.lesson) {
+    if ((cur.lesson.day || '') > (s.lesson.day || '')) out.lesson = cur.lesson;
+    else if (cur.lesson.day === s.lesson.day) out.lesson = { day: s.lesson.day, done: [...new Set((s.lesson.done || []).concat(cur.lesson.done || []))], talk: Math.max(+s.lesson.talk || 0, +cur.lesson.talk || 0) };
+  }
+  if (Array.isArray(cur.lessonDays) && Array.isArray(s.lessonDays)) out.lessonDays = [...new Set(cur.lessonDays.concat(s.lessonDays))].sort().slice(-400);
   if (Array.isArray(s.tests) || Array.isArray(cur.tests)) {
     const all = new Map(); (cur.tests || []).concat(s.tests || []).forEach((x) => x && x.day && all.set(x.day + '|' + (x.at || 0), x));
     out.tests = [...all.values()].sort((a, b) => (a.at || 0) - (b.at || 0)).slice(-24);
@@ -161,6 +168,14 @@ function cleanState(s) {
     out.flu = {}; Object.keys(s.flu).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort().slice(-60).forEach((k) => { const x = s.flu[k] || {};
       out.flu[k] = { w: Math.max(0, Math.min(1e5, +x.w || 0)), s: Math.max(0, Math.min(1e5, +x.s || 0)), f: Math.max(0, Math.min(1e5, +x.f || 0)), n: Math.max(0, Math.min(1e4, +x.n || 0)) }; });
   }
+  if (s.story && typeof s.story === 'object' && day(s.story.day)) {
+    const x = s.story;
+    out.story = { day: x.day, title: str(x.title, 80), en: str(x.en, 1500), uz: str(x.uz, 2000),
+      questions: (Array.isArray(x.questions) ? x.questions : []).slice(0, 3).filter((q) => q && q.q).map((q) => ({ q: str(q.q, 200), uz: str(q.uz, 200) })),
+      words: (Array.isArray(x.words) ? x.words : []).slice(0, 3).filter((w) => w && w.w).map((w) => ({ w: str(w.w, 60), uz: str(w.uz, 120), ex: str(w.ex, 200) })) };
+  }
+  if (s.lesson && typeof s.lesson === 'object' && day(s.lesson.day)) out.lesson = { day: s.lesson.day, done: (Array.isArray(s.lesson.done) ? s.lesson.done : []).filter((x) => /^[a-z]{2,12}$/.test(x)).slice(0, 10), talk: Math.max(0, Math.min(99, +s.lesson.talk || 0)) };
+  if (Array.isArray(s.lessonDays)) out.lessonDays = s.lessonDays.filter((d) => day(d)).slice(-400);
   if (typeof s.lastDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.lastDay)) out.lastDay = s.lastDay;
   Object.keys(out).forEach((k) => out[k] === undefined && delete out[k]);
   return out;

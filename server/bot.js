@@ -124,7 +124,7 @@ const remindKb = (hours) => ({ inline_keyboard: [
   db.HOURS.slice(4).map((h) => ({ text: (hours.includes(h) ? '✅ ' : '') + hh(h), callback_data: 'rh:' + h })),
   [{ text: hours.length ? "🔕 Hammasini o'chirish" : '🔔 09:00, 15:00, 20:00', callback_data: hours.length ? 'rh:off' : 'rh:def' }]] });
 const remindText = (hours) => hours.length
-  ? `🔔 <b>Eslatmalar:</b> ${hours.map(hh).join(', ')} (Toshkent vaqti)\n\nNavbat bilan eslataman: 1-soat <b>so'z yodlash</b> (tugmali test), 2-soat <b>gapirish mashqi</b> (savol, ovozli javob), 3-soat yana <b>so'z yodlash</b>. Siz faol bo'lsangiz, bezovta qilmayman.\n\nSoatlarni bosib yoqing yoki o'chiring:`
+  ? `🔔 <b>Eslatmalar:</b> ${hours.map(hh).join(', ')} (Toshkent vaqti)\n\nNavbat bilan eslataman: 1-soat <b>tinglash</b> (1 daqiqalik hikoya va savollar), 2-soat <b>gapirish mashqi</b> (savol, ovozli javob), 3-soat <b>so'z yodlash</b> (tugmali test). Siz faol bo'lsangiz, bezovta qilmayman.\n\nSoatlarni bosib yoqing yoki o'chiring:`
   : "🔕 Eslatmalar o'chiq. Soat tanlang:";
 async function cmdRemind(msg, user) {
   const h = db.hours(user);
@@ -134,6 +134,8 @@ async function onCallback(cq) {
   if (!cq.from || cq.from.is_bot) return;
   const user = db.touchUser(cq.from); if (user.banned) return;
   if (tooFast('c' + user.id, 40)) return tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Sekinroq 🙂' }).catch(() => {});
+  const tm = String(cq.data || '').match(/^tt:(show|next)$/);
+  if (tm && cq.message) return onTranslateCb(cq, user, tm[1]);
   const rm = String(cq.data || '').match(/^rv:([a-z0-9]{1,8}):(\d|x)$/);
   if (rm && cq.message) return onReview(cq, user, rm[1], rm[2]);
   const sm = String(cq.data || '').match(/^set:(lang|gender):(both|en|auto|female|male)$/);
@@ -180,7 +182,7 @@ async function cmdAbout(msg, user, arg) {
 }
 async function cmdSettings(msg, user) { await say(msg.chat.id, setText(), { reply_markup: setKb(db.getState(user.id).settings) }); }
 async function cmdHelp(msg) {
-  await say(msg.chat.id, "/start — boshlash\n/stats — natijalarim\n/words — bugun takrorlanadigan so'zlar\n/review — so'z yodlash (tugmali test, 5 ta savol)\n/premium — Premium (Telegram Stars)\n/remind — eslatma soatlari (bot o'zi savol yuboradi)\n/name — hamrohga ism berish\n/settings — javob tili (ikki tilda) va ovoz (ayol/erkak)\n/about — o'zingiz haqingizda (masalan: muhandisman), suhbat shunga moslashadi\n/report — haftalik hisobot (har yakshanba 20:00 da o'zim ham yuboraman)\n\nBotga ovozli yoki matnli xabar yuborsangiz ham, javob beraman. Ismimni yozsangiz yoki aytsangiz, \"Labbay!\" deyman.", { reply_markup: appKeyboard() });
+  await say(msg.chat.id, "/start — boshlash\n/stats — natijalarim\n/words — bugun takrorlanadigan so'zlar\n/review — so'z yodlash (tugmali test, 5 ta savol)\n/dars — bugungi 10 daqiqalik dars\n/tarjima — tez tarjima mashqi\n/tinglash — 1 daqiqalik hikoya va savollar\n/premium — Premium (Telegram Stars)\n/remind — eslatma soatlari (bot o'zi savol yuboradi)\n/name — hamrohga ism berish\n/settings — javob tili (ikki tilda) va ovoz (ayol/erkak)\n/about — o'zingiz haqingizda (masalan: muhandisman), suhbat shunga moslashadi\n/report — haftalik hisobot (har yakshanba 20:00 da o'zim ham yuboraman)\n\nBotga ovozli yoki matnli xabar yuborsangiz ham, javob beraman. Ismimni yozsangiz yoki aytsangiz, \"Labbay!\" deyman.", { reply_markup: appKeyboard() });
 }
 async function cmdAdmin(msg, user, arg) {
   if (!ADMINS.includes(user.id)) return;
@@ -277,6 +279,7 @@ async function handleVoice(msg, user) {
   catch (e) { return say(msg.chat.id, e.code === 'quota' ? "Bugungi ovoz limiti tugadi. Yozib yuboring yoki /premium oling." : "Ovozni tushunolmadim. Qayta yuboring."); }
   if (!t.text) return say(msg.chat.id, 'Hech narsa eshitmadim 🤔 Yana bir bor ayting-chi.');
   await say(msg.chat.id, '🎧 <i>' + esc(t.text) + '</i>');
+  if (await checkTranslate(msg, user, t.text)) return;
   return quickChat(msg, user, t.text, t.dur || v.duration);
 }
 
@@ -332,6 +335,70 @@ async function onReview(cq, user, id, pick) {
   return tg('editMessageText', { chat_id: chatId, message_id: mid, text, parse_mode: 'HTML', reply_markup: noAppButtons({ reply_markup: { inline_keyboard: kb } }).reply_markup }).catch(() => {});
 }
 
+/* ---------- quick translation: an Uzbek sentence, the learner says it in English ---------- */
+async function sendTranslate(chatId, user, editOf) {
+  const st = db.getState(user.id), p = L.pair(st.ttRecent);
+  if (!p) return say(chatId, "Gaplar topilmadi.");
+  st.tt = { en: p.en, uz: p.uz, at: Date.now() }; st.ttRecent = (st.ttRecent || []).concat(p.en).slice(-80);
+  db.putState(user.id, st);
+  const text = `⚡ <b>Tez tarjima</b>\n\n🇺🇿 <b>${esc(p.uz)}</b>\n\nInglizchasini 5 soniyada ayting: ovozli xabar yoki yozib yuboring.`;
+  const kb = { inline_keyboard: [[{ text: "👀 Javobni ko'rsatish", callback_data: 'tt:show' }, { text: '⏭ Keyingisi', callback_data: 'tt:next' }]] };
+  if (editOf) return tg('editMessageText', { chat_id: chatId, message_id: editOf, text, parse_mode: 'HTML', reply_markup: kb }).catch(() => say(chatId, text, { reply_markup: kb }));
+  return say(chatId, text, { reply_markup: kb });
+}
+/* the learner's answer to a pending translation (true when it was one) */
+async function checkTranslate(msg, user, text) {
+  const st = db.getState(user.id), tt = st.tt;
+  if (!tt || Date.now() - tt.at > 15 * 60000) return false;
+  delete st.tt; st.ttStat = st.ttStat || { n: 0, ok: 0 };
+  const r = S.prompts.compareSpoken(tt.en, text), good = r.score >= 75;
+  st.ttStat.n++; if (good) st.ttStat.ok++;
+  db.putState(user.id, st);
+  const marks = r.words.map((x) => (x.ok ? esc(x.w) : `<u>${esc(x.w)}</u>`)).join(' ');
+  await say(msg.chat.id, `${good ? "✅ <b>To'g'ri!</b>" : '🔁 <b>Deyarli</b>'} ${r.score}%\n\nTo'g'ri javob: <b>${esc(tt.en)}</b>\n${good ? '' : `Tushib qolgan yoki boshqacha aytilgan so'zlar tagiga chizilgan:\n${marks}\n`}\nJami: ${st.ttStat.ok}/${st.ttStat.n} to'g'ri`, { reply_markup: { inline_keyboard: [[{ text: '⚡ Keyingisi', callback_data: 'tt:next' }], [appBtn2('🦜 Soya mashqi (Mini App)', 'drill')]] } });
+  return true;
+}
+async function onTranslateCb(cq, user, act) {
+  const chatId = cq.message.chat.id;
+  if (act === 'next') { await tg('answerCallbackQuery', { callback_query_id: cq.id }).catch(() => {}); return sendTranslate(chatId, user); }
+  const st = db.getState(user.id), tt = st.tt;
+  if (!tt) return tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Yangi gap: /tarjima' }).catch(() => {});
+  delete st.tt; db.putState(user.id, st);
+  await tg('answerCallbackQuery', { callback_query_id: cq.id, text: tt.en.slice(0, 190) }).catch(() => {});
+  return say(chatId, `👀 <b>${esc(tt.en)}</b>\n<i>Ovoz chiqarib 2 marta takrorlang.</i>`, { reply_markup: { inline_keyboard: [[{ text: '⚡ Keyingisi', callback_data: 'tt:next' }]] } });
+}
+
+/* ---------- morning listening: a one-minute story with two questions ---------- */
+async function makeStory(user, st) {
+  if (st.story && st.story.day === L.tday() && st.story.en) return st.story;
+  const out = await S.runAI(user, 'story', { level: (st.settings && st.settings.level) || 'B1', about: st.settings && st.settings.about, words: L.targets(st.words, 5).map((w) => w.w), seed: Math.floor(Math.random() * 100) });
+  const m = out.text.match(/\{[\s\S]*\}/); const r = m ? JSON.parse(m[0]) : null;
+  if (!r || !r.en) throw new Error('no story');
+  const story = { day: L.tday(), title: String(r.title || 'Story').slice(0, 80), en: String(r.en).slice(0, 1500), uz: String(r.uz || '').slice(0, 2000),
+    questions: (Array.isArray(r.questions) ? r.questions : []).slice(0, 3).filter((q) => q && q.q).map((q) => ({ q: String(q.q).slice(0, 200), uz: String(q.uz || '').slice(0, 200) })),
+    words: (Array.isArray(r.words) ? r.words : []).slice(0, 3).filter((w) => w && w.w).map((w) => ({ w: String(w.w).slice(0, 60), uz: String(w.uz || '').slice(0, 120), ex: String(w.ex || '').slice(0, 200) })) };
+  const fresh = db.getState(user.id); fresh.story = story; db.putState(user.id, fresh);
+  return story;
+}
+async function sendStory(chatId, user, intro) {
+  const st = db.getState(user.id);
+  await tg('sendChatAction', { chat_id: chatId, action: 'typing' }).catch(() => {});
+  const s = await makeStory(user, st);
+  const qs = s.questions.map((q, i) => `${i + 1}. <b>${esc(q.q)}</b>\n<tg-spoiler>${esc(q.uz)}</tg-spoiler>`).join('\n');
+  const text = (intro ? intro + '\n\n' : '') + `🎧 <b>${esc(s.title)}</b>\n\nAvval matnni ko'rmasdan tinglang (Mini Appda ▶), keyin o'qing:\n<tg-spoiler>${esc(s.en)}</tg-spoiler>\n\n🇺🇿 Tarjimasi:\n<tg-spoiler>${esc(s.uz)}</tg-spoiler>\n\n❓ <b>Savollar</b> (ovozli xabar bilan javob bering):\n${qs}`;
+  await say(chatId, text, { reply_markup: { inline_keyboard: [[appBtn2('🎧 Mini Appda tinglash', 'drill')], [{ text: "🧠 So'z testi (5 ta)", callback_data: 'rv:new:0' }]] } });
+  const ch = (st.settings && st.settings.char) || {};
+  sendVoiceText(chatId, user, s.en, S.prompts.voiceFor(ch.id, st.settings && st.settings.gender), st.settings && st.settings.style).catch(() => {});
+  /* the questions start the bot conversation, so a voice answer is checked with the story in mind */
+  const fresh = db.getState(user.id);
+  fresh.botTurns = (fresh.botTurns || []).concat([{ role: 'assistant', content: JSON.stringify({ emotion: 'happy', reply: s.questions.map((q) => q.q).join(' '), story: s.en.slice(0, 1100) }) }]).slice(-10);
+  db.putState(user.id, fresh);
+}
+async function cmdStory(msg, user) {
+  try { await sendStory(msg.chat.id, user); }
+  catch (e) { await say(msg.chat.id, e.code === 'quota' ? "Bugungi bepul AI javoblar tugadi." : "Hikoya tayyorlab bo'lmadi. Birozdan keyin /tinglash ni qayta yuboring."); }
+}
+
 /* ---------- payments (Telegram Stars) ---------- */
 async function onPreCheckout(pq) {
   const ok = pq.currency === 'XTR' && pq.total_amount === PREMIUM_STARS && pq.invoice_payload === 'prem:' + pq.from.id;
@@ -369,6 +436,9 @@ async function handleUpdate(u) {
     if (c === 'stats') return cmdStats(msg, user);
     if (c === 'words') return cmdWords(msg, user);
     if (c === 'review' || c === 'takror' || c === 'quiz') return cmdReview(msg, user);
+    if (c === 'tarjima' || c === 'translate') return sendTranslate(msg.chat.id, user);
+    if (c === 'tinglash' || c === 'listen' || c === 'story') return cmdStory(msg, user);
+    if (c === 'dars' || c === 'lesson') return say(msg.chat.id, "📅 <b>Bugungi dars</b> · 10 daqiqa: so'zlar, soya mashqi, tez tarjima, suhbat va xatolaringiz. Hammasi bitta tugmada:", { reply_markup: { inline_keyboard: [[appBtn2('📅 Darsni boshlash', 'drill')]] } });
     if (c === 'premium') return cmdPremium(msg, user);
     if (c === 'remind') return cmdRemind(msg, user);
     if (c === 'name') return cmdName(msg, user, m[2]);
@@ -379,6 +449,7 @@ async function handleUpdate(u) {
     return cmdHelp(msg);
   }
   if (text.length > 1000) return say(msg.chat.id, 'Xabar juda uzun. Qisqaroq yozing.');
+  if (await checkTranslate(msg, user, text)) return;
   return quickChat(msg, user, text);
 }
 
@@ -430,7 +501,8 @@ async function sendVoiceText(chatId, user, text, voice, style) {
 function remindKind(hours, h, st) {
   const i = Math.max(0, hours.indexOf(h));
   const words = (st.words || []).filter((w) => w && w.uz && w.src !== 'pattern');
-  return i % 2 === 0 && words.length ? 'words' : 'talk';
+  const k = ['listen', 'talk', 'words'][i % 3];
+  return k === 'words' && !words.length ? 'talk' : k;
 }
 async function remindOne(row, hour, day) {
   let st = {}; try { st = JSON.parse(row.json || '{}'); } catch (e) {}
@@ -438,9 +510,13 @@ async function remindOne(row, hour, day) {
   const kind = remindKind(hours, hour, st);
   const s = streak(st), dw = dueWords(st).length;
   const user = db.getUser(row.id);
-  const kb = { inline_keyboard: [[appBtn('🗣 Mini Appda gaplashish')], [appBtn2("📚 So'zlar va xatolar", 'words')]] };
+  const kb = { inline_keyboard: [[appBtn('🗣 Mini Appda gaplashish')], [appBtn2('📅 Bugungi dars (10 daq)', 'drill')], [{ text: '⚡ Tez tarjima', callback_data: 'tt:next' }]] };
   const fire = s >= 2 ? `🔥 ${s} kunlik seriya! ` : '';
-  if (kind === 'words') {
+  if (kind === 'listen') {
+    try { await sendStory(row.chat_id, user, `☀️ ${fire}<b>Xayrli tong! Tinglash vaqti.</b>` + (dw ? `\n📚 Bugun ${dw} ta so'z ham kutyapti (pastdagi tugma).` : '') + `\n📅 To'liq 10 daqiqalik dars: /dars`); return 'listen'; }
+    catch (e) { /* no AI right now: a word round instead */ }
+  }
+  if (kind === 'words' || kind === 'listen') {
     const tg5 = L.targets(st.words, 3).map((w) => `<b>${esc(w.w)}</b> — <tg-spoiler>${esc(w.uz)}</tg-spoiler>`);
     const intro = `⏰ ${fire}<b>So'z yodlash vaqti!</b>` + (dw ? `\n📚 Bugun ${dw} ta so'z takrorlashni kutyapti.` : '') + (tg5.length ? `\n\n🎯 Bugun suhbatda ishlatib ko'ring:\n${tg5.join('\n')}` : '') + '\n\n2 daqiqalik test, boshladik:';
     if (await startReview(row.chat_id, user, intro)) return 'words';
@@ -509,7 +585,7 @@ async function setup({ publicUrl, secret, polling }) {
   appUrl = publicUrl;
   await tg('setMyCommands', { commands: [
     { command: 'start', description: 'Boshlash' }, { command: 'stats', description: 'Natijalarim' },
-    { command: 'review', description: "So'z yodlash (tugmali test)" }, { command: 'words', description: "Takrorlash uchun so'zlar" }, { command: 'premium', description: 'Premium (Stars)' },
+    { command: 'dars', description: 'Bugungi dars (10 daqiqa)' }, { command: 'review', description: "So'z yodlash (tugmali test)" }, { command: 'tarjima', description: 'Tez tarjima mashqi' }, { command: 'tinglash', description: 'Tinglash: hikoya va savollar' }, { command: 'words', description: "Takrorlash uchun so'zlar" }, { command: 'premium', description: 'Premium (Stars)' },
     { command: 'remind', description: 'Eslatma soatlari' }, { command: 'name', description: 'Hamrohga ism berish' }, { command: 'settings', description: 'Javob tili va ovoz (ayol/erkak)' }, { command: 'report', description: 'Haftalik hisobot' }, { command: 'about', description: "O'zim haqimda (suhbat shunga moslashadi)" }, { command: 'help', description: 'Yordam' }] });
   if (appUrl) await tg('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Gaplashish', web_app: { url: appUrl + '/' } } });
   setInterval(() => reminderTick().catch((e) => console.error('remind', e.message)), 5 * 60000).unref();

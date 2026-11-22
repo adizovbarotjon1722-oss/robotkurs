@@ -105,6 +105,13 @@ So'zlar bo'limida **3000 so'z kursi** bor: eng ko'p ishlatiladigan 3076 ta so'z 
 - **Railway bepul rejasida** xizmat 10 daqiqa jim tursa uxlaydi va eslatma yubora olmaydi. Shuning uchun server har 4 daqiqada Telegram'ga kichik so'rov yuborib, uyg'oq turadi (biroz ko'proq resurs sarflaydi). O'chirish: Railway Variables'ga `KEEP_AWAKE=0`.
 - **Oylik gapirish testi**: Sozlamalar → "📈 Gapirish testi". 5 ta savolga ovoz bilan javob berasiz; AI darajangizni (A1–C2), 100 ballik baho, ravonlik, grammatika, so'z boyligi va bog'lanish ballarini, shu oy nimaga e'tibor berishni aytadi. Natijalar saqlanadi va o'tgan oy bilan solishtiriladi.
 
+## Mashq bo'limi: bugungi dars, tez tarjima, soya mashqi, tinglash
+- **📅 Bugungi dars (10 daqiqa)**: bitta tugma. Navbat bilan: so'z takrorlash, soya mashqi (3 gap), tez tarjima (3 gap), suhbat (3 ta javob), o'z xatolaringizni takrorlash. Ketma-ket kunlar sanaladi. Botda: /dars.
+- **⚡ Tez tarjima**: o'zbekcha gap chiqadi, 5 soniyada inglizcha aytasiz; so'zma-so'z tekshiriladi. Gaplar 109 ta gap qolipidan va AI bugungi so'zlaringiz bilan tuzgan gaplardan olinadi. Botda: /tarjima (ovozli yoki yozib javob).
+- **🦜 Soya mashqi**: gapni eshitasiz va darhol takrorlaysiz; noto'g'ri yoki tushib qolgan so'zlar qizil bilan belgilanadi. "Sekin" va "Matnsiz" rejimlari bor.
+- **🎧 Tinglash**: 1 daqiqalik hikoya (ish/sayohat mavzusida, darajangizga mos) va 2 ta savol. Bot har kuni birinchi eslatma soatida yuboradi (/tinglash). Javobni suhbatda yoki botga ovozli xabar bilan berasiz.
+- Eslatmalar tartibi: 1-soat tinglash, 2-soat gapirish mashqi, 3-soat so'z testi.
+
 ## Ish va sayohat uchun
 - **Muhandis ishi (10 ta rol o'yini):** stand-up yig'ilish, texnik muammoni tushuntirish, obyektda xorijlik hamkasb, loyiha taqdimoti, muddat kelishuvi, ta'minotchi bilan qo'ng'iroq, chizmani tasvirlash, xavfsizlik brifingi, muhandis intervyusi, hamkasb bilan small talk.
 - **Sayohat (9 ta):** aeroport, mehmonxona, taksi, chipta, yo'qolgan bagaj, dorixona, ekskursiya, kafe, yo'l so'rash.
