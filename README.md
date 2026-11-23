@@ -166,7 +166,7 @@ ADMIN_IDS dagi odam Mini App → Sozlamalar ichida **"AI kalitlari"** bo'limini 
 Pastki menyuda to'rtinchi bo'lim: **Ertak·Qo'shiq** (botda `/ertak`). Hammasi A1, A2, B1, B2 darajalarga bo'lingan, har birida "📚 Dars" (qaysi grammatika mashq qilinadi) va yangi so'zlar bor.
 - **20 ta ertak** (`web/fun.js`): Ezop masallari, aka-uka Grimm, Andersen va Afandi latifalari, o'rganuvchi uchun qayta yozilgan. Hikoyachi va qahramonlar turli ovozda, gapma-gap tarjima, takrorlab tinglash, 3 ta savol va "Lug'atga qo'shish".
 - **26 ta xalq qo'shig'i** (mualliflik huquqi tugagan). 15 tasida kuy bor: ilova o'zi ohangni chaladi (🎵 Kuy), 🎤 Navbat rejimida bir qatorni ilova, keyingisini siz kuylaysiz; qolganlari 🥁 Ritm (baraban ostida o'qish). Tezlik 0.8x-1.2x.
-- **47 ta mashhur qo'shiq** ro'yxati (Bruno Mars, Ed Sheeran, Queen, Adele…): nima o'rganiladi, qanday tinglash kerak, YouTube'da so'zlari bilan ochish va suhbatda muhokama.
+- **88 ta haqiqiy qo'shiq** (asl ijrochilar: Louis Armstrong, ABBA, Bruno Mars, Ed Sheeran, Queen, Adele…) ilova ichidagi YouTube pleyerda: 🐢 0.75x/0.5x, ⏪ 5 s, 🔁 Yana, 👂 Ko'rmasdan (faqat quloq bilan), ✂️ Bo'lib-bo'lib (har 8 soniyada to'xtab, takrorlash). Video server orqali topiladi (`/api/yt`, 30 kun keshlanadi; `YOUTUBE_API_KEY` bo'lsa rasmiy API ishlatiladi). Xalq qo'shiqlarining ham haqiqiy ijrosi bor.
 - **✨ AI yozgan ertak va qo'shiqlar**: o'rgangan so'zlaringizdan, tanlangan darajada (AI turlari `tale`, `song`). Oxirgi 20 tasi "Meniki" bo'limida.
 
 ## Barqarorlik va pullik AI (2026-11-23)

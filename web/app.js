@@ -1612,11 +1612,61 @@ function renderEpisodes(box){
   box.append(btn('btn', '← Mashqlarga', renderDrill));
 }
 /* ================= Ertak · Qo'shiq: tales and songs by level ================= */
-let funDone = LS.get('funDone', {}), funMine = LS.get('funMine', []), funTab = LS.get('funTab', 'tales'), funLv = null;
+let funDone = LS.get('funDone', {}), funMine = LS.get('funMine', []), funTab = LS.get('funTab2', 'pop'), funLv = null;
 const funLevel = () => funLv || vlevel();
 const funMark = id => { funDone[id] = (funDone[id] || 0) + 1; LS.set('funDone', funDone); };
 function openExt(url){ try { if (TG && TG.openLink) return TG.openLink(url); } catch(e){} window.open(url, '_blank', 'noopener'); }
 const ytLink = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
+/* ---- real recordings: a YouTube player inside the app with listening tools ---- */
+let ytApi = null, ytPlayer = null, ytTimer = null;
+function loadYT(){
+  if (ytApi) return ytApi;
+  ytApi = new Promise((res, rej) => {
+    if (window.YT && window.YT.Player) return res(window.YT);
+    const prev = window.onYouTubeIframeAPIReady; window.onYouTubeIframeAPIReady = () => { if (prev) prev(); res(window.YT); };
+    const sc = document.createElement('script'); sc.src = 'https://www.youtube.com/iframe_api'; sc.onerror = () => { ytApi = null; rej(new Error('yt')); }; document.head.append(sc);
+    setTimeout(() => { if (!(window.YT && window.YT.Player)){ ytApi = null; rej(new Error('yt')); } }, 15000);
+  });
+  return ytApi;
+}
+function stopYT(){ clearInterval(ytTimer); ytTimer = null; try { if (ytPlayer) ytPlayer.destroy(); } catch(e){} ytPlayer = null; }
+function realSong(c, q, onWatched){
+  const box = el('div', 'ytwrap'); box.append(el('div', 'dstep', '🎬 Haqiqiy ijro'));
+  const open = btn('btn', "▶ YouTube'da ochish", () => openExt(ytLink(q)));
+  if (!SERVER){ box.append(el('p', 'note', "Video Telegram ichidagi ilovada shu yerning o'zida ochiladi. Bu ko'rinishda YouTube'da oching."), open); c.append(box); return; }
+  const frame = el('div', 'ytbox'), slot = el('div'); slot.id = 'yt' + Date.now(); frame.append(slot);
+  const cover = el('div', 'ytcover'); cover.append(el('b', null, '👂'), el('span', null, "Faqat quloq bilan: ekranga qaramay tinglang")); cover.hidden = true; frame.append(cover);
+  const st = el('div', 'note', 'Video qidirilmoqda…');
+  let ids = [], idx = 0, rate = 1, phrase = false, segA = 0, segEnd = 0, watched = 0, told = false, lastT = 0;
+  const P2 = () => ytPlayer && ytPlayer.getCurrentTime ? ytPlayer : null;
+  const back = btn('btn', '⏪ 5 s', () => { const p = P2(); if (p) p.seekTo(Math.max(0, p.getCurrentTime() - 5), true); });
+  const again = btn('btn', '🔁 Yana', () => { const p = P2(); if (!p) return; const t = phrase ? segA : Math.max(0, p.getCurrentTime() - 8); p.seekTo(t, true); segA = t; segEnd = t + 8; p.playVideo(); });
+  const sp = btn('btn', '🐢 1x', () => { rate = rate === 1 ? 0.75 : rate === 0.75 ? 0.5 : 1; sp.textContent = '🐢 ' + rate + 'x'; const p = P2(); if (p) p.setPlaybackRate(rate); });
+  const eyes = btn('btn', "👂 Ko'rmasdan", () => { cover.hidden = !cover.hidden; eyes.classList.toggle('on2', !cover.hidden); });
+  const ph = btn('btn', "✂️ Bo'lib-bo'lib", () => { phrase = !phrase; ph.classList.toggle('on2', phrase); const p = P2(); if (p){ segA = p.getCurrentTime(); segEnd = segA + 8; }
+    st.textContent = phrase ? "Har 8 soniyada to'xtaydi: eshitganingizni ovoz chiqarib takrorlang, tushunmasangiz 🔁 Yana bosing, keyin ▶." : ''; });
+  const pl = btn('btn primary', '▶ / ⏸', () => { const p = P2(); if (!p) return; if (p.getPlayerState() === 1) p.pauseVideo(); else { if (phrase){ segA = p.getCurrentTime(); segEnd = segA + 8; } p.playVideo(); } });
+  const row = el('div', 'drow'); row.append(pl, back, again, sp, eyes, ph);
+  const tips = el('ol', 'popsteps');
+  ["👂 Ko'rmasdan rejimida bir marta tinglang: nechta so'z tanidingiz?", "Endi so'zlari ekranda chiqadigan video bilan kuzating.", "✂️ Bo'lib-bo'lib rejimida har qatorni qaytaring, qiyin joyda 🐢 0.75x.", "Oxirida yana ko'rmasdan tinglang: farqni sezasiz."].forEach(t => tips.append(el('li', null, t)));
+  box.append(frame, st, row, tips, open); c.append(box);
+  const tryNext = () => { idx++; if (idx < ids.length && ytPlayer){ ytPlayer.loadVideoById(ids[idx]); st.textContent = 'Boshqa video ochilmoqda…'; } else { st.textContent = "Bu qo'shiqni ilova ichida ochib bo'lmadi. YouTube'da oching."; frame.hidden = true; row.hidden = true; } };
+  api('/api/yt?' + new URLSearchParams({ q })).then(r => r.json()).then(j => { ids = j.ids || []; if (!ids.length) throw new Error('none'); return loadYT(); }).then(YT => {
+    stopYT();
+    ytPlayer = new YT.Player(slot.id, { videoId: ids[0], width: '100%', height: '100%', host: 'https://www.youtube-nocookie.com',
+      playerVars: { playsinline: 1, rel: 0, modestbranding: 1, cc_load_policy: 1, cc_lang_pref: 'en', hl: 'en', origin: location.origin },
+      events: {
+        onReady: e => { try { e.target.setVolume(Math.round(vol() * 100)); } catch(x){} st.textContent = "Tayyor: ▶ ni bosing. Avval 👂 Ko'rmasdan tinglab ko'ring."; },
+        onError: tryNext
+      } });
+    ytTimer = setInterval(() => {
+      const p = P2(); if (!p || !p.getPlayerState || p.getPlayerState() !== 1) return;
+      const t = p.getCurrentTime(); if (t > lastT && t - lastT < 2) watched += t - lastT; lastT = t;
+      if (!told && watched > 60){ told = true; if (onWatched) onWatched(); }
+      if (phrase && t >= segEnd){ p.pauseVideo(); segA = t; segEnd = t + 8; st.textContent = "⏸ Takrorlang. 🔁 Yana yoki ▶ davom."; }
+    }, 250);
+  }).catch(() => { st.textContent = "Videoni ilova ichida ochib bo'lmadi. YouTube'da oching."; frame.hidden = true; row.hidden = true; });
+}
 /* a tale from the library (or one the AI wrote) in the audio-lesson player format */
 function taleEp(t){
   return { id: t.id, kind: 'tale', lv: t.lv, ic: t.ic, title: t.t, focus: t.focus, names: Object.assign({ N: 'Narrator' }, t.names || {}), g: t.g || {},
@@ -1633,7 +1683,7 @@ function synthBus(){
 }
 function stopTune(){ tuneNodes.forEach(n => { try { n.stop(); } catch(e){} }); tuneNodes = []; }
 function stopBeat(){ clearInterval(beatT); beatT = null; }
-function stopFunAudio(){ stopTune(); stopBeat(); }
+function stopFunAudio(){ stopTune(); stopBeat(); stopYT(); }
 /* plays one line of notes, resolves when it ends; returns its length in seconds too */
 function playTune(notes, bpm){
   const out = synthBus(), ns = FUN.parseNotes(notes), spb = 60 / bpm; let t = actx.currentTime + 0.06;
@@ -1691,7 +1741,7 @@ function renderFun(){
     c.append(row); box.append(c);
   }
   const seg = el('div', 'fseg');
-  [['tales', "📖 Ertaklar"], ['songs', "🎵 Qo'shiqlar"], ['pop', '⭐ Mashhur'], ['mine', '✨ Meniki']].forEach(([id, t]) => seg.append(btn('segb' + (funTab === id ? ' on' : ''), t, () => { funTab = id; LS.set('funTab', id); renderFun(); })));
+  [['pop', "🎧 Haqiqiy qo'shiqlar"], ['tales', "📖 Ertaklar"], ['songs', "🎵 O'quv qo'shiqlar"], ['mine', '✨ Meniki']].forEach(([id, t]) => seg.append(btn('segb' + (funTab === id ? ' on' : ''), t, () => { funTab = id; LS.set('funTab2', id); renderFun(); })));
   box.append(seg);
   const item = (ic, t, sub, fn, isDone, fun) => { const b = btn('dpick' + (isDone ? ' done' : ''), '', fn); b.append(el('span', 'dic', ic), el('b', null, t + (fun ? ' 😄' : '') + (isDone ? ' ✓' : '')), el('small', null, sub)); box.append(b); };
   if (funTab === 'tales'){
@@ -1703,7 +1753,7 @@ function renderFun(){
     FUN.SONGS.filter(x => x.lv === lv).forEach(s => item(s.ic, s.t, s.focus + (s.lines.some(l => l[2]) ? ' · 🎵 kuy bor' : ' · 🥁 ritm'), () => runSong(box, songOf(s), renderFun), done(s.id), s.fun));
     box.append(btn('btn primary', "✨ So'zlarimdan yangi qo'shiq", () => newFun(box, 'song')));
   } else if (funTab === 'pop'){
-    box.append(el('p', 'note', "Haqiqiy qo'shiqlar YouTube'da so'zlari bilan ochiladi. Usul: 1) shunchaki tinglang, 2) so'zlarini o'qib tinglang, 3) qo'shilib kuylang, 4) bitta qatorini yod oling."));
+    box.append(el('p', 'note', "Asl ijrochilar kuylagan haqiqiy qo'shiqlar ilova ichida ochiladi: sekinlatish, 5 soniya orqaga, bo'lib-bo'lib tinglash va ko'rmasdan tinglash rejimi bilan. Kuniga bitta qo'shiq — eshitish qobiliyati uchun eng yoqimli mashq."));
     const list = FUN.POP.filter(x => x[2] === lv); (list.length ? list : FUN.POP).forEach(p => { const id = 'pop:' + p[0]; item(p[3] ? '🔥' : '🎧', p[0], p[1] + ' · ' + p[4], () => runPop(box, p, renderFun), done(id)); });
   } else {
     box.append(el('p', 'note', "Bu yerda AI siz o'rgangan so'zlardan yozgan ertak va qo'shiqlar saqlanadi (oxirgi 20 ta)."));
@@ -1762,8 +1812,8 @@ function runSong(box, s, back){
     stop(); mark(-1);
     if (!one){ funMark(s.id); dnote(c, "👏 Barakalla! Endi 🎤 Navbat rejimida o'zingiz kuylab ko'ring yoki YouTube'da asl ijroni tinglang."); }
   }
+  if (!s.ai) realSong(c, s.t + ' song with lyrics', null);
   const foot = el('div', 'drow');
-  if (!s.ai) foot.append(btn('btn', "▶ YouTube'da tinglash", () => openExt(ytLink(s.t + ' song with lyrics'))));
   foot.append(btn('btn', '← Orqaga', () => { stop(); back(); }));
   c.append(foot); box.append(c);
 }
@@ -1771,18 +1821,16 @@ function runPop(box, p, back){
   box.innerHTML = ''; stopFunAudio(); stopSpeaking();
   const [title, artist, lv, hot, learn] = p, id = 'pop:' + title, c = el('div', 'dcard');
   c.append(el('div', 'dstep', `${hot ? "🔥 Sho'x" : '🎧 Sokin'} · ${lv} daraja`), el('div', 'dtitle', title), el('div', 'note', artist), el('div', 'focus', '📚 Nima o\'rganasiz: ' + learn));
-  const steps = el('ol', 'popsteps');
-  ["Birinchi marta shunchaki tinglang, nimani tushunganingizni belgilang.", "Ikkinchi marta so'zlari (lyrics) bilan tinglang, 3 ta yangi so'zni yozib oling.", "Uchinchi marta qo'shilib kuylang: tezlikni 0.75x qilib qo'yish mumkin.", "Bitta yoqqan qatorni yod oling va suhbatda ishlating."].forEach(t => steps.append(el('li', null, t)));
-  c.append(steps);
+  box.append(c);
+  realSong(c, title + ' ' + artist + ' lyrics', () => funMark(id));
   const row = el('div', 'drow');
-  row.append(btn('btn primary', "▶ YouTube'da (so'zlari bilan)", () => { openExt(ytLink(title + ' ' + artist + ' lyrics')); }),
-    btn('btn', funDone[id] ? '✓ Tinglandi' : '✓ Tingladim', e => { funMark(id); e.target.textContent = '✓ Tinglandi'; }),
+  row.append(btn('btn', funDone[id] ? '✓ Tinglandi' : '✓ Tingladim', e => { funMark(id); e.target.textContent = '✓ Tinglandi'; }),
     btn('btn', '🗣 Suhbatda gaplashish', () => {
       const qq = `Let's talk about the song "${title}" by ${artist}. Have you listened to it? What is it about, and how does it make you feel?`;
       turns.push({ role:'assistant', content: JSON.stringify({ emotion:'happy', reply: qq }) }); saveChat();
       setRoom('talk'); qMsg({ emotion:'happy', reply: qq, praise_uz: '🎵 «' + title + '» haqida suhbat' }); speakTurn({ reply: qq }, true);
     }));
-  c.append(row, btn('btn', '← Orqaga', back)); box.append(c);
+  c.append(row, btn('btn', '← Orqaga', () => { stopYT(); back(); }));
 }
 async function newFun(box, kind){
   box.innerHTML = ''; stopFunAudio(); const c = el('div', 'dcard'), lv = funLevel(), ws = studiedWords(10);

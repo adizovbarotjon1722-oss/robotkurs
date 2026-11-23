@@ -552,4 +552,31 @@ async function checkAll() {
   return { ai, voice, order: order(), keys: keyList() };
 }
 
-module.exports = { C, keyList, setKey, loadKeys, checkAll, provider, selfTest, voiceTest, anyVoice, voiceOn, today, isPremium, quota, runAI, tts, stt, ApiError, prompts };
+/* ---------- real songs: YouTube video ids for a search (YOUTUBE_API_KEY if set, else the public results page) ---------- */
+async function ytFind(q) {
+  const key = 'yt:' + q.toLowerCase();
+  try { const c = JSON.parse(db.kvGet(key) || 'null'); if (c && c.ids && c.ids.length && Date.now() - c.at < 30 * 864e5) return c.ids; } catch (e) {}
+  let ids = [];
+  if (process.env.YOUTUBE_API_KEY) {
+    try {
+      const r = await withTimeout('https://www.googleapis.com/youtube/v3/search?' + new URLSearchParams({ part: 'id', type: 'video', videoEmbeddable: 'true', maxResults: '6', q, key: process.env.YOUTUBE_API_KEY }), {}, 12000);
+      if (r.ok) ids = ((await r.json()).items || []).map((x) => x.id && x.id.videoId).filter(Boolean);
+    } catch (e) { console.error('youtube api', e.name); }
+  }
+  if (!ids.length) {
+    const r = await withTimeout('https://www.youtube.com/results?' + new URLSearchParams({ search_query: q, hl: 'en', gl: 'US' }), { headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'accept-language': 'en-US,en;q=0.9' } }, 12000);
+    const html = await r.text();
+    const seen = new Set(); const re = /"videoRenderer":\{"videoId":"([\w-]{11})"/g; let m;
+    while ((m = re.exec(html)) && seen.size < 6) seen.add(m[1]);
+    if (!seen.size) { const re2 = /"videoId":"([\w-]{11})"/g; while ((m = re2.exec(html)) && seen.size < 6) seen.add(m[1]); }
+    ids = [...seen];
+  }
+  if (!ids.length) throw new ApiError('yt', 502);
+  db.kvSet(key, JSON.stringify({ ids, at: Date.now() }));
+  return ids;
+}
+async function ytTest() {
+  try { const ids = await ytFind('What a Wonderful World Louis Armstrong lyrics'); console.log("Haqiqiy qo'shiqlar (YouTube): ishlayapti ✓ " + ids.length + ' ta'); }
+  catch (e) { console.log("Haqiqiy qo'shiqlar (YouTube): qidiruv ishlamadi (" + (e.code || e.name) + "), ilova YouTube havolasini ochadi"); }
+}
+module.exports = { ytFind, ytTest, C, keyList, setKey, loadKeys, checkAll, provider, selfTest, voiceTest, anyVoice, voiceOn, today, isPremium, quota, runAI, tts, stt, ApiError, prompts };

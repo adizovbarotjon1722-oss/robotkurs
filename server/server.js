@@ -71,8 +71,8 @@ const SEC_HEADERS = {
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'Cross-Origin-Opener-Policy': 'same-origin'
 };
-const CSP = ["default-src 'self'", "script-src 'self' 'unsafe-inline' https://telegram.org", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src https://fonts.gstatic.com", "img-src 'self' data: blob:", "media-src 'self' blob:", "connect-src 'self'",
+const CSP = ["default-src 'self'", "script-src 'self' 'unsafe-inline' https://telegram.org https://www.youtube.com https://s.ytimg.com", "frame-src https://www.youtube.com https://www.youtube-nocookie.com", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src https://fonts.gstatic.com", "img-src 'self' data: blob: https://i.ytimg.com", "media-src 'self' blob:", "connect-src 'self'",
   "frame-ancestors https://web.telegram.org https://*.telegram.org", "base-uri 'none'", "form-action 'none'", "object-src 'none'"].join('; ');
 
 function send(res, status, body, headers) {
@@ -194,6 +194,15 @@ async function apiRoute(req, res, url) {
   if (url.pathname === '/api/me' && req.method === 'GET')
     return json(res, 200, { now: Date.now(), quota: S.quota(user), state: db.getState(user.id), name: user.first_name, remind: db.hours(user), voice: S.anyVoice(), admin: ADMIN_IDS.includes(user.id) });
 
+  /* ---- real songs: find a YouTube video to play inside the app (cached) ---- */
+  if (url.pathname === '/api/yt' && req.method === 'GET') {
+    if (!allow('yt' + user.id, 15)) return json(res, 429, { error: 'rate_limited' });
+    const q = String(url.searchParams.get('q') || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120);
+    if (q.length < 3) return json(res, 400, { error: 'bad_query' });
+    try { return json(res, 200, { ids: await S.ytFind(q) }); }
+    catch (e) { return json(res, 502, { error: 'yt' }); }
+  }
+
   /* ---- owner only: AI keys and their health ---- */
   if (url.pathname.startsWith('/api/admin/')) {
     if (!ADMIN_IDS.includes(user.id)) return json(res, 403, { error: 'forbidden' });
@@ -306,7 +315,7 @@ async function started() {
   S.loadKeys();
   console.log('Ovozni tanish:', S.C.groqKey ? 'groq' : S.C.openaiKey ? 'openai' : 'yoq', '| jonli ovoz:', S.C.openaiKey ? 'openai (tekshirilmoqda)' : 'bepul ovoz tekshirilmoqda');
   console.log('AI larni tekshiryapman...');
-  S.selfTest().then(() => S.voiceTest()).catch((e) => console.error('selftest', e.message));
+  S.selfTest().then(() => S.voiceTest()).then(() => S.ytTest()).catch((e) => console.error('selftest', e.message));
   const polling = !!process.env.USE_POLLING;
   let url = PUBLIC_URL;
   /* Telegram opens a Mini App only from an https address. On your own computer a free
