@@ -208,6 +208,12 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .epl .who{font-size:11.5px;font-weight:800;color:var(--muted)}.epl .en{font-size:16px;line-height:1.45}.epl .uz{display:none;font-size:13px;opacity:.75;margin-top:3px}
 .eplines.showuz .uz{display:block}.kw{color:var(--teal-deep);text-decoration:underline dotted;cursor:help}
 .epqs{display:grid;gap:8px}.epq{display:grid;gap:4px;border-top:1px dashed var(--line);padding-top:8px}.epa{font-size:14px;color:var(--good)}
+.vtop{font-size:17px;line-height:1;position:relative}.vtop small{position:absolute;bottom:-2px;right:-2px;font-size:9px;font-weight:800;background:var(--surface);border-radius:6px;padding:0 3px;border:1px solid var(--line)}
+#volume{width:100%;accent-color:var(--teal-deep)}
+.vtabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+.vtab{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:8px 4px 10px;display:grid;justify-items:center;gap:2px;position:relative;overflow:hidden;color:inherit}
+.vtab b{font-size:17px}.vtab small{font-size:11px;color:var(--muted)}.vtab i{position:absolute;left:0;bottom:0;height:4px;width:var(--p,0);background:var(--good)}
+.vtab.on{border-color:var(--teal-deep);background:color-mix(in srgb,var(--teal-deep) 12%,var(--surface));box-shadow:0 0 0 1px var(--teal-deep)}
 .targets{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:2px 14px 6px;font-size:12.5px}
 .targets .tl{color:var(--muted,#6b7c93);font-weight:700}
 .targets .tw{border:1px dashed var(--teal-deep);background:transparent;color:var(--teal-deep);border-radius:999px;padding:3px 10px;font-weight:700;font-size:12.5px}
@@ -372,6 +378,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
       <span class="ring" id="goalRing" aria-hidden="true"></span>
       <span class="num" id="goalText">0/10</span>
     </button>
+    <button class="iconbtn vtop" id="qvolTop" aria-label="Ovoz balandligi" title="Ovoz balandligi">🔉</button>
     <button class="iconbtn" id="openSettings" aria-label="Sozlamalar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
     </button>
@@ -424,9 +431,9 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
     </div>
     <div class="wscroll">
       <div id="practice"></div>
-      <div class="sec"><h3>3000 so'z kursi</h3><div class="course" id="course"></div></div>
-      <div class="sec"><h3>Gap qoliplari (eng ko'p ishlatiladigan)</h3><div class="packs" id="patPacks"></div></div>
-      <div class="sec"><h3>Tayyor to'plamlar</h3><div class="packs" id="packs"></div></div>
+      <div class="sec"><h3>Darajangiz bo'yicha so'zlar (3000 ta eng kerakli)</h3><div class="course" id="course"></div></div>
+      <div class="sec"><h3 id="patTitle">Gap qoliplari</h3><div class="packs" id="patPacks"></div></div>
+      <div class="sec"><h3 id="packTitle">Mavzuli so'zlar</h3><div class="packs" id="packs"></div></div>
       <div class="sec"><h3>Mening so'zlarim</h3><div class="wl" id="wordList"></div></div>
     </div>
   </section>
@@ -492,6 +499,9 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
   </label>
   <label for="goal">Kunlik maqsad
     <select id="goal"><option value="5">5 daqiqa</option><option value="10" selected>10 daqiqa</option><option value="15">15 daqiqa</option><option value="20">20 daqiqa</option><option value="30">30 daqiqa</option></select>
+  </label>
+  <label for="volume">Ovoz balandligi <b id="volVal">60%</b>
+    <input type="range" id="volume" min="5" max="100" step="5" value="60">
   </label>
   <label for="rate">Gapirish tezligi
     <select id="rate"><option value="0.8">Sekin</option><option value="0.95" selected>O'rtacha</option><option value="1.1">Tez</option></select>

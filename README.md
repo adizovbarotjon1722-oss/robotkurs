@@ -119,6 +119,11 @@ So'zlar bo'limida **3000 so'z kursi** bor: eng ko'p ishlatiladigan 3076 ta so'z 
 - Oxirida 3 ta savol (javob namunasi bilan) va "Suhbatda javob berish". Oxirgi 15 ta dars saqlanadi: bir darsni 2-3 kun qayta tinglash eng tez natija beradi.
 - Ertalabki hikoya (bot, 09:00) ham endi so'nggi o'rgangan so'zlaringizdan tuziladi.
 
+## Ovoz balandligi va darajalar bo'yicha lug'at
+- **Ovoz balandligi**: yuqoridagi 🔉 tugma (har bosishda 30% → 50% → 70% → 100%), Sozlamalardagi siljitgich (5–100%) va Audio dars pleyeridagi tugma. Standart 60%. Barcha ovozlarga (AI ovozi va telefon ovozi) ta'sir qiladi.
+- **Lug'at darajalar bo'yicha**: So'zlar bo'limida A1 · A2 · B1 · B2 tugmalari. Har darajada: shu darajaning eng ko'p ishlatiladigan so'zlari (3000 kursdan: 1-513 A1, 514-1026 A2, 1027-2052 B1, 2053+ B2), shu darajadagi **gap qoliplari** (vaziyat bo'yicha guruhlangan) va **mavzuli so'zlar**. Kunlik yangi so'zlar tanlangan darajadan keladi.
+- **🎯 Darajamni aniqlash**: har darajadan 8 tadan 32 ta so'z; bilganlaringizni belgilaysiz, mos daraja tanlanadi va bilgan so'zlaringiz "yodlangan" bo'ladi.
+
 ## Ish va sayohat uchun
 - **Muhandis ishi (10 ta rol o'yini):** stand-up yig'ilish, texnik muammoni tushuntirish, obyektda xorijlik hamkasb, loyiha taqdimoti, muddat kelishuvi, ta'minotchi bilan qo'ng'iroq, chizmani tasvirlash, xavfsizlik brifingi, muhandis intervyusi, hamkasb bilan small talk.
 - **Sayohat (9 ta):** aeroport, mehmonxona, taksi, chipta, yo'qolgan bagaj, dorixona, ekskursiya, kafe, yo'l so'rash.

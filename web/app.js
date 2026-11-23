@@ -189,7 +189,10 @@ async function ttsBlob(text, uz, g){
   const b = await r.blob(); if (ttsCache.size > 60) ttsCache.clear(); ttsCache.set(key, b); return b;
 }
 /* one audio element for all speech: phones allow it to play once the user has touched the screen */
-let player = null, playerAn = null, audioUnlocked = false;
+let player = null, playerAn = null, playerGain = null, audioUnlocked = false;
+/* loudness of all speech, 5-100% (the AI voices come out loud on many phones) */
+const vol = () => Math.max(0.05, Math.min(1, settings.volume == null ? 0.6 : +settings.volume));
+function applyVolume(){ if (playerGain) playerGain.gain.value = vol(); if (player) player.volume = playerGain ? 1 : vol(); }
 function getPlayer(){ if (!player){ player = new Audio(); player.preload = 'auto'; player.setAttribute('playsinline', ''); } return player; }
 const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 function unlockAudio(){
@@ -201,7 +204,8 @@ function unlockAudio(){
 function lipSync(audio){
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
-    if (!playerAn){ const src = actx.createMediaElementSource(audio); playerAn = actx.createAnalyser(); playerAn.fftSize = 512; src.connect(playerAn); playerAn.connect(actx.destination); }
+    if (!playerAn){ const src = actx.createMediaElementSource(audio); playerAn = actx.createAnalyser(); playerAn.fftSize = 512; playerGain = actx.createGain(); src.connect(playerGain); playerGain.connect(playerAn); playerAn.connect(actx.destination); }
+    applyVolume();
     const an = playerAn;
     const buf = new Uint8Array(an.fftSize); q.classList.add('lipsync');
     const loop = () => {
@@ -216,6 +220,7 @@ function sayAI(text, uz, g, pr){
   return ttsBlob(text, uz, g).then(b => new Promise(res => {
     const url = URL.createObjectURL(b); audioEl = getPlayer(); audioEl.src = url;
     try { audioEl.playbackRate = Math.max(0.6, Math.min(1.5, pr || 1)); audioEl.preservesPitch = true; } catch(e){}
+    applyVolume();
     audioEl.onended = audioEl.onerror = () => { URL.revokeObjectURL(url); res(); };
     lipSync(audioEl);
     audioEl.play().catch(() => { URL.revokeObjectURL(url); status('', "Ovozni yoqish uchun ekranga bir marta bosing 🔊"); audioUnlocked = false; res(); });
@@ -250,7 +255,7 @@ function sayBrowser(text, rate, uz, g){
     if (!('speechSynthesis' in window) || !text) return res();
     const u = new SpeechSynthesisUtterance(text); const v = uz ? uzVoice() : g ? genderVoice(g) : enVoice();
     if (uz && !v) return setTimeout(res, Math.min(2500, 400 + text.length * 35));
-    if (v) u.voice = v; u.lang = v ? v.lang : 'en-US'; u.rate = rate || +settings.rate; u.pitch = g && !uz ? (g === 'male' ? (v && isMaleV(v) ? 1 : 0.7) : (v && isFemaleV(v) ? 1.05 : 1.25)) : voicePitch(v, uz);
+    if (v) u.voice = v; u.lang = v ? v.lang : 'en-US'; u.rate = rate || +settings.rate; u.volume = vol(); u.pitch = g && !uz ? (g === 'male' ? (v && isMaleV(v) ? 1 : 0.7) : (v && isFemaleV(v) ? 1.05 : 1.25)) : voicePitch(v, uz);
     let done = false; const fin = () => { if (!done){ done = true; clearInterval(t); res(); } };
     u.onend = fin; u.onerror = fin; speechSynthesis.speak(u);
     const t = setInterval(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) fin(); }, 500); /* some browsers forget onend */
@@ -654,7 +659,7 @@ function coreDaily(force){
   const waiting = words.filter(w => w.src === 'core' && !w.box && !w.seen).length;
   const want = force ? (coreN() || 10) : Math.max(0, Math.min(coreN(), coreN() * 2 - waiting));
   const have = wordSet(); let n = 0;
-  for (const x of CORE.list){
+  for (const x of coreSource()){
     if (n >= want) break;
     if (have.has(x.w.toLowerCase())) continue;
     words.push({ w:x.w, uz:x.uz, ex:x.ex, box:0, due:today(), src:'core' }); n++;
@@ -813,34 +818,69 @@ function renderWrite(box){
 }
 
 /* 3000-word course card: progress by level, words per day, quick "I already know these" check */
+/* ===== vocabulary by level (CEFR): words by frequency band, sentence patterns and topic packs ===== */
+const VLEVELS = ['A1', 'A2', 'B1', 'B2'];
+const VL_INFO = {
+  A1: "Boshlang'ich: eng zarur 500 so'z va oddiy gaplar. Tanishuv, raqamlar, kundalik ishlar.",
+  A2: "Asosiy: kundalik hayot, xarid, yo'l, ish haqida oddiy suhbat.",
+  B1: "O'rta: ishda va safarda erkin gaplashish, fikr bildirish, tajriba haqida gapirish.",
+  B2: "Yuqori o'rta: yig'ilish, muzokara, murakkab fikrlarni aniq aytish."
+};
+/* frequency bands of the 3000 course -> level (1-513 A1, 514-1026 A2, 1027-2052 B1, 2053+ B2) */
+const coreLevel = i => { const b = levelOf(i); return b === 0 ? 'A1' : b === 1 ? 'A2' : b <= 3 ? 'B1' : 'B2'; };
+const PAT_LV = {};
+['My name is ...', "I'm from ...", 'I work as ...', 'Do you ...?', 'Are you ...?', 'How much is/are ...?', 'Can I ...?', "I'd like ...", "Let's ...", 'I think (that) ...', 'I have to ...', '..., because ...', '... is bigger than ...', 'There is / There are ...', "I'm happy that ...", 'Sorry, could you repeat that?', 'How do you say ... in English?', 'I will ...', 'Is there a ... near here?', 'What time does ... start?', 'How do I get to ...?', "I'm looking for ...", 'Could you speak more slowly?', 'Let me think.', 'Could you ..., please?', 'May I ...?', 'Would you like ...?', 'In my free time, I ...']
+  .forEach(w => PAT_LV[w] = 'A1');
+["I've been ...ing for ...", 'How long have you ...?', 'Have you ever ...?', "Would you mind ...ing?", 'Do you want me to ...?', 'It seems (that) ...', 'The problem is (that) ...', 'It depends on ...', 'To be honest, ...', "I'm about to ...", "I've just ...", "I've already ...", "I haven't ... yet.", 'I used to ...', 'It takes ... to ...', "You'd better ...", "You mustn't ...", "If ..., I'll ...", "That's why ...", 'Although ..., ...', 'In order to ...', "... is the best ... I've ever ...", '... is as ... as ...', "It's too ... to ...", '... enough to ...', "I'm looking forward to ...ing", 'I feel like ...ing', "I'm tired of ...ing", "It's a pity (that) ...", "I'm responsible for ...", 'Let me check and get back to you.', 'We need to ... by ...', 'The main issue is ...', "What's the status of ...?", 'Can we schedule a meeting for ...?', 'I have a reservation under ...', 'Could you recommend ...?', 'What do you mean by ...?', 'What I mean is ...', 'Anyway, ...', "I'm worried about ...", "I can't wait to ...", 'Make sure (that) ...', "I don't agree because ...", 'In my opinion, ...', "It's important to ...", "I'll take care of it.", "I'm working on ...", 'How long does it take to ...?', 'Is breakfast included?', 'Can you show me on the map?', "I'd like to pay by ...", 'Excuse me, is this seat taken?']
+  .forEach(w => PAT_LV[w] = 'B1');
+['By the time ..., I had ...', 'If I had ..., I would ...', "If I were you, I'd ...", 'Unless ..., ...', 'The more ..., the more ...', 'The point is ...', 'As far as I know, ...', "As soon as ..., I'll ...", "I'm not sure if ..."]
+  .forEach(w => PAT_LV[w] = 'B2');
+const patLevel = w => PAT_LV[w] || 'A2';
+const PACK_LV = { daily:'A1', food:'A1', travel:'A1', home:'A1', shopping:'A1', city:'A1', time:'A1', feel:'A2', talk:'A2', work:'A2', health:'A2', polite:'A2', trip:'A2', tech:'A2', phrasal:'B1', opinion:'B1', linkers:'B1', jobtalk:'B1', meetings:'B1', engineer:'B1', feelings2:'B2' };
+const vlevel = () => VLEVELS.includes(settings.vlevel) ? settings.vlevel : ({ A2:'A2', B1:'B1', B2:'B2', C1:'B2' }[settings.level] || 'A2');
+const levelWords = lv => CORE.list.filter(x => coreLevel(x.i) === lv);
+/* new course words come from the chosen level first, then the next ones */
+function coreSource(){ const i = VLEVELS.indexOf(vlevel()); return VLEVELS.slice(i).concat(VLEVELS.slice(0, i)).flatMap(levelWords); }
+function addPackItems(items, src, b){
+  let n = 0; items.forEach(i => { if (!hasWord(i.w)) words.push(Object.assign({ w:i.w, uz:i.uz, ex:i.ex, box:0, due:addDays(Math.floor(n++ / 8)), src }, i.trick ? { trick:i.trick } : {})); });
+  LS.set('words', words); queue = []; renderWordsRoom(); emote('excited'); if (b) feathers(b, 8);
+  status('', n ? `${n} ta qo'shildi: kuniga 8 tadan chiqadi.` : "Bular allaqachon bor.");
+}
+function packBtn(title, items, kind, src){
+  const have = items.filter(i => hasWord(i.w)).length, full = have === items.length;
+  const b = btn('pack' + (full ? ' added' : ''), '', () => { if (!full) addPackItems(items, src, b); });
+  b.append(el('b', null, title), el('span', null, full ? "Qo'shilgan ✓" : `${items.length} ta ${kind}${have ? `, ${have} tasi bor` : ''}`));
+  return b;
+}
 function renderCourse(){
   const box = $('course'); if (!box) return; box.innerHTML = '';
   if (!CORE.list.length){ box.hidden = true; return; }
-  const map = new Map(words.map(w => [String(w.w).toLowerCase(), w]));
-  const lv = CORE_LV.map(() => ({ total:0, added:0, learned:0 }));
-  CORE.list.forEach(x => { const l = lv[levelOf(x.i)]; l.total++; const w = map.get(x.w.toLowerCase()); if (w){ l.added++; if (w.box >= 4) l.learned++; } });
-  const added = lv.reduce((a, l) => a + l.added, 0), learned = lv.reduce((a, l) => a + l.learned, 0);
-  const head = el('div','chead'); head.append(el('b', null, `${learned} ta yodlangan · ${added} / ${CORE.list.length} boshlangan`), el('span', null, "Eng ko'p ishlatiladigan so'zlar, chastota bo'yicha"));
+  const map = new Map(words.map(w => [String(w.w).toLowerCase(), w])), cur = vlevel();
+  /* overview: every level at a glance */
+  const stat = {}; VLEVELS.forEach(l => stat[l] = { total:0, added:0, learned:0 });
+  CORE.list.forEach(x => { const s = stat[coreLevel(x.i)]; s.total++; const w = map.get(x.w.toLowerCase()); if (w){ s.added++; if (w.box >= 4) s.learned++; } });
+  const tabs = el('div', 'vtabs');
+  VLEVELS.forEach(l => { const s = stat[l], b = btn('vtab' + (l === cur ? ' on' : ''), '', () => { settings.vlevel = l; saveSettings(); renderCourse(); renderPacks(); });
+    const bar = el('i'); bar.style.setProperty('--p', (s.learned / s.total * 100).toFixed(1) + '%'); b.append(el('b', null, l), el('small', null, `${s.learned}/${s.total}`), bar); tabs.append(b); });
+  box.append(tabs);
+  const s = stat[cur];
+  box.append(el('p', 'note', VL_INFO[cur]));
+  const head = el('div','chead'); head.append(el('b', null, `${cur}: ${s.learned} ta yodlangan · ${s.added} / ${s.total} boshlangan`), el('span', null, "Shu darajaning eng ko'p ishlatiladigan so'zlari, chastota bo'yicha"));
   box.append(head);
-  const bars = el('div','clv');
-  lv.forEach((l, i) => {
-    const r = el('div','clrow'); const bar = el('div','cbar'); const a = el('i','a'), b = el('i','b');
-    a.style.width = (l.added / l.total * 100).toFixed(1) + '%'; b.style.width = (l.learned / l.total * 100).toFixed(1) + '%';
-    bar.append(a, b); r.append(el('span', null, CORE_LV[i]), bar, el('small', null, `${l.learned}/${l.total}`)); bars.append(r);
-  });
-  box.append(bars);
+  const bar = el('div','cbar'); const a = el('i','a'), b2 = el('i','b'); a.style.width = (s.added / s.total * 100).toFixed(1) + '%'; b2.style.width = (s.learned / s.total * 100).toFixed(1) + '%'; bar.append(a, b2); box.append(bar);
   const per = el('div','cper'); per.append(el('span', null, "Kuniga yangi so'z:"));
   const seg = el('div','seg');
   [0, 5, 10, 15, 20].forEach(n => { const b = btn('', n ? String(n) : "To'xtat", () => { settings.coreN = n; saveSettings(); renderCourse(); }); b.setAttribute('aria-pressed', coreN() === n); seg.append(b); });
   per.append(seg); box.append(per);
   const acts = el('div','cacts');
-  acts.append(btn('btn', `+${coreN() || 10} ta so'z hozir`, () => { const n = coreDaily(true); emote(n ? 'excited' : 'gentle'); status('', n ? `${n} ta yangi so'z qo'shildi. Kartochkadan boshlang!` : "Hamma so'zlar qo'shib bo'lingan!"); renderWordsRoom(); }));
+  acts.append(btn('btn', `+${coreN() || 10} ta ${cur} so'z hozir`, () => { const n = coreDaily(true); emote(n ? 'excited' : 'gentle'); status('', n ? `${n} ta yangi so'z qo'shildi. Kartochkadan boshlang!` : "Hamma so'zlar qo'shib bo'lingan!"); renderWordsRoom(); }));
   acts.append(btn('btn', "Bilganlarimni belgilash", () => renderKnown(box)));
+  acts.append(btn('btn', '🎯 Darajamni aniqlash', () => renderPlacement(box)));
   box.append(acts);
 }
-/* show the next 40 words; tap the ones you already know, they skip straight to "yodlangan" */
+/* show the next 40 words of the chosen level; tap the ones you already know */
 function renderKnown(box){
-  const have = wordSet(), next40 = CORE.list.filter(x => !have.has(x.w.toLowerCase())).slice(0, 40), pick = new Set();
+  const have = wordSet(), next40 = levelWords(vlevel()).filter(x => !have.has(x.w.toLowerCase())).slice(0, 40), pick = new Set();
   const p = el('div','known');
   p.append(el('p','note',"Biladigan so'zlaringizni bosing. Ular yodlanganlar qatoriga o'tadi va bir oydan keyin bir marta tekshiriladi. Qolganlari navbat bilan o'rgatiladi."));
   const chips = el('div','chips');
@@ -852,22 +892,45 @@ function renderKnown(box){
     if (pick.size){ LS.set('words', words); emote('proud'); status('', `${pick.size} ta so'z "bilaman" deb belgilandi.`); }
     renderWordsRoom();
   }), btn('btn', 'Bekor qilish', () => renderCourse()));
+  p.append(row); box.innerHTML = ''; box.append(p);
+}
+/* one-minute placement: 8 random words from each level, tick the ones you know -> suggested level */
+function renderPlacement(box){
+  const have = wordSet(), sample = {}, pick = new Set();
+  VLEVELS.forEach(l => { const pool = levelWords(l); sample[l] = shuffle(pool.slice(0, 500)).slice(0, 8); });
+  box.innerHTML = '';
+  const p = el('div','known');
+  p.append(el('div', 'dtitle', '🎯 Darajani aniqlash'), el('p','note',"Ma'nosini aniq biladigan so'zlaringizni bosing (taxmin qilmang). 32 ta so'z, 1 daqiqa."));
+  const chips = el('div','chips');
+  shuffle(VLEVELS.flatMap(l => sample[l].map(x => [l, x]))).forEach(([l, x]) => { const c = btn('chip', x.w, () => { pick.has(x) ? pick.delete(x) : pick.add(x); c.classList.toggle('on', pick.has(x)); }); chips.append(c); });
+  p.append(chips);
+  const row = el('div','cacts');
+  row.append(btn('btn primary', 'Natija', () => {
+    const pct = {}; VLEVELS.forEach(l => pct[l] = Math.round(sample[l].filter(x => pick.has(x)).length / sample[l].length * 100));
+    const lv = VLEVELS.find(l => pct[l] < 75) || 'B2';
+    settings.vlevel = lv; saveSettings();
+    pick.forEach(x => { if (!have.has(x.w.toLowerCase())) words.push({ w:x.w, uz:x.uz, ex:x.ex, box:5, due:addDays(30), src:'core', seen:1 }); });
+    LS.set('words', words);
+    box.innerHTML = '';
+    const r = el('div','known'); r.append(el('div', 'dtitle', `Sizga mos daraja: ${lv}`));
+    VLEVELS.forEach(l => { const row = el('div','clrow'); const bar = el('div','cbar'); const a = el('i','b'); a.style.width = pct[l] + '%'; bar.append(a); row.append(el('span', null, l), bar, el('small', null, pct[l] + '%')); r.append(row); });
+    r.append(el('p','note', `${lv} darajasidagi so'zlarning taxminan ${100 - pct[lv]}% ini hali bilmaysiz: eng tez o'sish shu yerda. Bilgan so'zlaringiz "yodlangan" deb belgilandi, yangi so'zlar endi ${lv} darajasidan keladi.`));
+    r.append(btn('btn primary', 'Boshlash', () => { coreDaily(true); renderWordsRoom(); }));
+    box.append(r); emote('proud');
+  }), btn('btn', 'Bekor qilish', () => renderCourse()));
   p.append(row); box.append(p);
 }
 function renderPacks(){
-  const box0 = $('packs'), boxP = $('patPacks'); box0.innerHTML = ''; if (boxP) boxP.innerHTML = '';
-  Object.values(PACKS).forEach(p => {
-    const box = p.pat && boxP ? boxP : box0;
-    const items = packItems(p), have = items.filter(i => hasWord(i.w)).length, full = have === items.length;
-    const b = btn('pack' + (full ? ' added' : ''), '', () => {
-      if (full) return;
-      /* 8 new words a day, so a big pack doesn't land all at once */
-      let n = 0; items.forEach(i => { if (!hasWord(i.w)) words.push(Object.assign({ w:i.w, uz:i.uz, ex:i.ex, box:0, due:addDays(Math.floor(n++ / 8)), src:p.pat ? 'pattern' : 'pack' }, i.trick ? { trick:i.trick } : {})); });
-      LS.set('words', words); queue = []; renderWordsRoom(); emote('excited'); feathers(b, 8);
-    });
-    b.append(el('b', null, p.uz), el('span', null, full ? "Qo'shilgan" : `${items.length} ta ${p.pat ? 'qolip' : "so'z"}${have ? `, ${have} tasi bor` : ''}`));
-    box.append(b);
+  const cur = vlevel(), boxP = $('patPacks'), box0 = $('packs'); if (boxP) boxP.innerHTML = ''; box0.innerHTML = '';
+  $('patTitle').textContent = `Gap qoliplari · ${cur}`; $('packTitle').textContent = `Mavzuli so'zlar · ${cur}`;
+  /* sentence patterns of this level, grouped by situation */
+  (CORE.patterns || []).forEach(g => {
+    const items = g.list.filter(x => patLevel(x.w) === cur); if (!items.length) return;
+    boxP.append(packBtn(g.uz, items, 'qolip', 'pattern'));
   });
+  if (!boxP.childElementCount) boxP.append(el('p', 'note', "Bu darajada qolip yo'q."));
+  Object.entries(PACKS).forEach(([k, p]) => { if (p.pat || (PACK_LV[k] || 'A2') !== cur) return; box0.append(packBtn(p.uz, packItems(p), "so'z", 'pack')); });
+  if (!box0.childElementCount) box0.append(el('p', 'note', "Bu darajada mavzuli to'plam yo'q: boshqa darajani tanlang."));
 }
 function renderWordList(){
   const box = $('wordList'); box.innerHTML = '';
@@ -1112,6 +1175,15 @@ $('apikey').value = settings.key; $('oakey').value = settings.oakey; $('readUz')
 $('level').onchange = e => { settings.level = e.target.value; saveSettings(); };
 $('goal').onchange = e => { settings.goal = +e.target.value; saveSettings(); renderGoal(); renderDays(); };
 $('rate').onchange = e => { settings.rate = +e.target.value; saveSettings(); };
+function renderVolume(){ const v = Math.round(vol() * 100); $('volume').value = v; $('volVal').textContent = v + '%'; const ic = v < 35 ? '🔈' : v < 75 ? '🔉' : '🔊'; document.querySelectorAll('.qvol').forEach(b => b.textContent = ic + ' ' + v + '%'); const t = $('qvolTop'); t.textContent = ic; t.append(el('small', null, String(v))); }
+function setVolume(v, test){ settings.volume = Math.max(5, Math.min(100, Math.round(v))) / 100; applyVolume(); renderVolume(); saveSettings(); if (test){ clearTimeout(setVolume.t); setVolume.t = setTimeout(() => speakParts([{ text: 'This is how loud I am now.' }]), 350); } }
+$('volume').oninput = e => setVolume(+e.target.value, false);
+$('volume').onchange = e => setVolume(+e.target.value, true);
+/* quick button: 30% -> 50% -> 70% -> 100% */
+const nextVol = () => { const v = Math.round(vol() * 100); return v < 30 ? 30 : v < 50 ? 50 : v < 70 ? 70 : v < 100 ? 100 : 30; };
+function volBtn(){ const b = btn('btn qvol', '', () => setVolume(nextVol(), true)); b.title = 'Ovoz balandligi'; setTimeout(renderVolume); return b; }
+$('qvolTop').onclick = () => setVolume(nextVol(), true);
+renderVolume();
 $('voice').onchange = e => { settings.voice = e.target.value; saveSettings(); };
 $('apikey').onchange = e => { settings.key = e.target.value.trim(); saveSettings(); };
 $('oakey').onchange = e => { settings.oakey = e.target.value.trim(); saveSettings(); };
@@ -1467,7 +1539,7 @@ function runEpisode(box, ep){
   const speedBtn = btn('btn', '🐢 ' + epRate + 'x', () => { epRate = epRate >= 1 ? 0.75 : epRate >= 0.9 ? 1 : 0.9; LS.set('epRate', epRate); speedBtn.textContent = '🐢 ' + epRate + 'x'; });
   const repBtn = btn('btn' + (repeatMode ? ' on2' : ''), '🔁 Takrorlab', () => { repeatMode = !repeatMode; LS.set('epRepeat', repeatMode); repBtn.classList.toggle('on2', repeatMode); dnote(c, repeatMode ? "Har gapdan keyin pauza bo'ladi: ovoz chiqarib takrorlang (soya mashqi)." : 'Uzluksiz tinglash.'); });
   const uzBtn = btn('btn', '🇺🇿 Tarjima', () => { showUz = !showUz; list.classList.toggle('showuz', showUz); });
-  ctl.append(playBtn, speedBtn, repBtn, uzBtn); c.append(ctl);
+  ctl.append(playBtn, speedBtn, repBtn, uzBtn, volBtn()); c.append(ctl);
   const list = el('div', 'eplines');
   const rows = ep.lines.map((l, i) => {
     const r = el('div', 'epl ' + (ep.kind === 'story' ? 'n' : l.s === 'A' ? 'a' : 'b'));

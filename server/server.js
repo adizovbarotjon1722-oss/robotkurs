@@ -158,7 +158,8 @@ function cleanState(s) {
   if (s.settings && typeof s.settings === 'object') {
     const t = s.settings; out.settings = { level: S.prompts.LEVELS.includes(t.level) ? t.level : 'B1', goal: Math.min(60, Math.max(1, +t.goal || 10)), rate: Math.min(1.25, Math.max(0.7, +t.rate || 0.95)), readUz: t.readUz !== false, handsfree: t.handsfree !== false, calm: t.calm !== false, corrections: t.corrections === 'main' ? 'main' : 'all', lang: t.lang === 'en' ? 'en' : 'both', about: str(t.about, 200).trim() || undefined, gender: ['female', 'male'].includes(t.gender) ? t.gender : 'auto',
       style: S.prompts.pick(S.prompts.STYLES, t.style) ? t.style : 'samimiy', topic: S.prompts.pick(S.prompts.TOPICS, t.topic) ? t.topic : 'free',
-      coreN: Math.max(0, Math.min(30, t.coreN == null ? 10 : +t.coreN || 0)), coreDay: day(t.coreDay) };
+      coreN: Math.max(0, Math.min(30, t.coreN == null ? 10 : +t.coreN || 0)), coreDay: day(t.coreDay),
+      volume: Math.max(0.05, Math.min(1, t.volume == null ? 0.6 : +t.volume || 0.6)), vlevel: ['A1', 'A2', 'B1', 'B2'].includes(t.vlevel) ? t.vlevel : undefined };
     const c = t.char || {};
     out.settings.char = { id: S.prompts.pick(S.prompts.CHARACTERS, c.id) ? c.id : 'nur', color: /^#[0-9a-fA-F]{6}$/.test(c.color || '') ? c.color : '',
       acc: ['none', 'doppi', 'glasses', 'bow', 'crown', 'phones'].includes(c.acc) ? c.acc : 'none',
