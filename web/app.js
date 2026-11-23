@@ -175,8 +175,8 @@ function stopSpeaking(){
 }
 const MOOD = { excited:'very excited and bubbly', proud:'proud and cheering', love:'soft and affectionate', gentle:'gentle and patient', sad:'soft and caring', surprised:'surprised and amazed', laughing:'giggling and playful', thinking:'curious and thoughtful' };
 const ttsCache = new Map();
-async function ttsBlob(text, uz){
-  const emo = q.dataset.emo, voice = charVoice(), key = voice + settings.style + (uz?'u':'e') + emo + '|' + text;
+async function ttsBlob(text, uz, g){
+  const emo = q.dataset.emo, voice = g ? P.voiceFor(settings.char.id, g) : charVoice(), key = voice + settings.style + (uz?'u':'e') + emo + '|' + text;
   if (ttsCache.has(key)) return ttsCache.get(key);
   let r;
   if (SERVER) r = await api('/api/tts', { text, uz:!!uz, emotion:emo, speed:+settings.rate, voice, style:settings.style });
@@ -212,9 +212,10 @@ function lipSync(audio){
     requestAnimationFrame(loop);
   } catch(e){}
 }
-function sayAI(text, uz){
-  return ttsBlob(text, uz).then(b => new Promise(res => {
+function sayAI(text, uz, g, pr){
+  return ttsBlob(text, uz, g).then(b => new Promise(res => {
     const url = URL.createObjectURL(b); audioEl = getPlayer(); audioEl.src = url;
+    try { audioEl.playbackRate = Math.max(0.6, Math.min(1.5, pr || 1)); audioEl.preservesPitch = true; } catch(e){}
     audioEl.onended = audioEl.onerror = () => { URL.revokeObjectURL(url); res(); };
     lipSync(audioEl);
     audioEl.play().catch(() => { URL.revokeObjectURL(url); status('', "Ovozni yoqish uchun ekranga bir marta bosing 🔊"); audioUnlocked = false; res(); });
@@ -242,12 +243,14 @@ const voicePitch = (v, uz) => { const male = wantMale(); if (settings.gender ===
 const hasBrowserVoice = () => ('speechSynthesis' in window) && speechSynthesis.getVoices().length > 0;
 let noVoiceShown = false;
 function noVoiceNote(){ if (noVoiceShown) return; noVoiceShown = true; addMsg('q', "🔇 Bu telefonda ovoz chiqarib bo'lmadi: serverda jonli ovoz ishlamayapti, Telegram esa telefon ovozini bermayapti. Javoblarni matn sifatida o'qing. Terminalda \"Jonli ovoz\" qatoriga qarang.").classList.add('sys'); }
-function sayBrowser(text, rate, uz){
+/* a fixed man's or woman's voice (the two speakers of a dialogue) */
+const genderVoice = g => voices.find(g === 'male' ? isMaleV : isFemaleV) || voices[0];
+function sayBrowser(text, rate, uz, g){
   return new Promise(res => {
     if (!('speechSynthesis' in window) || !text) return res();
-    const u = new SpeechSynthesisUtterance(text); const v = uz ? uzVoice() : enVoice();
+    const u = new SpeechSynthesisUtterance(text); const v = uz ? uzVoice() : g ? genderVoice(g) : enVoice();
     if (uz && !v) return setTimeout(res, Math.min(2500, 400 + text.length * 35));
-    if (v) u.voice = v; u.lang = v ? v.lang : 'en-US'; u.rate = rate || +settings.rate; u.pitch = voicePitch(v, uz);
+    if (v) u.voice = v; u.lang = v ? v.lang : 'en-US'; u.rate = rate || +settings.rate; u.pitch = g && !uz ? (g === 'male' ? (v && isMaleV(v) ? 1 : 0.7) : (v && isFemaleV(v) ? 1.05 : 1.25)) : voicePitch(v, uz);
     let done = false; const fin = () => { if (!done){ done = true; clearInterval(t); res(); } };
     u.onend = fin; u.onerror = fin; speechSynthesis.speak(u);
     const t = setInterval(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) fin(); }, 500); /* some browsers forget onend */
@@ -262,9 +265,10 @@ async function speakParts(parts, opts){
   setTalking(true); activity();
   for (const p of parts){
     if (my !== speakToken) return;
-    if (useAIVoice()){ try { await sayAI(p.text, p.uz); continue; } catch(e){ if (SERVER && !p.uz && e.code !== 'rate_limited') serverVoice = false; if (p.uz && !uzVoice()) continue; } }
+    if (p.onStart) p.onStart();
+    if (useAIVoice()){ try { await sayAI(p.text, p.uz, p.g, p.rate && !p.uz ? p.rate / (+settings.rate || 1) : 1); continue; } catch(e){ if (SERVER && !p.uz && e.code !== 'rate_limited') serverVoice = false; if (p.uz && !uzVoice()) continue; } }
     if (SERVER && !hasBrowserVoice()){ noVoiceNote(); continue; }
-    await sayBrowser(p.text, p.rate || opts.rate, p.uz);
+    await sayBrowser(p.text, p.rate || opts.rate, p.uz, p.g);
     if (p.pause) await sleep(p.pause);
   }
   if (my !== speakToken) return;
@@ -1158,6 +1162,7 @@ async function initTelegram(){
     renderGoal(); renderBadge(); renderTopics(); startTalk(false); setTimeout(testNudge, 1200);
     const start = new URLSearchParams(location.search).get('room') || (TG.initDataUnsafe && TG.initDataUnsafe.start_param);
     if (start === 'words' || start === 'drill'){ setRoom(start); sync(); }
+    if (start === 'audio'){ setRoom('drill'); renderEpisodes($('drill')); sync(); }
   } catch(e){ status('', errText(e)); }
   window.addEventListener('pagehide', () => { if (syncT){ clearTimeout(syncT); pushState(); } });
   document.addEventListener('visibilitychange', () => { if (document.hidden && syncT){ clearTimeout(syncT); pushState(); } });
@@ -1410,6 +1415,123 @@ async function runListen(box, onDone, fresh){
   if (onDone) c.append(btn('btn', 'Davom etish →', onDone));
   play(settings.rate);
 }
+/* ---- audio lesson: a 2-3 minute dialogue or story made from the words you have studied ---- */
+let episodes = LS.get('episodes', []);
+/* studied words: the ones reviewed lately first, then today's targets, then the rest being learned */
+function studiedWords(n){
+  const week = Date.now() - 7 * 864e5, ok = w => w && w.w && w.src !== 'pattern' && w.w.length <= 30;
+  const recent = words.filter(w => ok(w) && (w.box||0) >= 1 && (w.t||0) > week).sort((a,b) => (b.t||0) - (a.t||0));
+  const out = [], seen = new Set();
+  recent.concat(targetWords(8), words.filter(w => ok(w) && (w.box||0) >= 1 && (w.box||0) <= 4)).forEach(w => { const k = w.w.toLowerCase(); if (!seen.has(k) && out.length < n){ seen.add(k); out.push(w); } });
+  return out;
+}
+async function makeEpisode(kind){
+  const ws = studiedWords(12);
+  const r = parseJSON(await ai('episode', { level:settings.level, about:settings.about || '', words:ws.map(w => w.w), kind, seed: Math.floor(Math.random() * 1000) }), null);
+  const lines = (r && Array.isArray(r.lines) ? r.lines : []).filter(l => l && l.en).slice(0, 40).map(l => ({ s:String(l.s || 'N').slice(0, 1).toUpperCase(), en:String(l.en).slice(0, 400), uz:String(l.uz || '').slice(0, 500) }));
+  if (lines.length < 6) throw new Error('bad');
+  const names = (r.names && typeof r.names === 'object') ? r.names : {};
+  const ep = { id: Date.now().toString(36), day: today(), kind: kind === 'story' ? 'story' : 'dialog', title: String(r.title || 'Audio dars').slice(0, 80),
+    names: { A: String(names.A || 'Anna').slice(0, 20), B: String(names.B || 'Tom').slice(0, 20), N: 'Narrator' }, male: names.male === 'A' ? 'A' : 'B',
+    lines, words: ws.map(w => ({ w: w.w, uz: w.uz })), questions: (Array.isArray(r.questions) ? r.questions : []).slice(0, 3).filter(x => x && x.q).map(x => ({ q:String(x.q).slice(0, 200), uz:String(x.uz || '').slice(0, 200), a:String(x.a || '').slice(0, 200) })), plays: 0 };
+  episodes = [ep].concat(episodes).slice(0, 15); LS.set('episodes', episodes);
+  return ep;
+}
+/* the studied words inside a line become tappable (meaning + pronunciation) */
+function lineHtml(text, ep){
+  const span = el('span'); let rest = text;
+  const list = ep.words.map(x => x.w).filter(Boolean).sort((a,b) => b.length - a.length);
+  if (!list.length){ span.textContent = text; return span; }
+  const re = new RegExp('\\b(' + list.map(escRe).join('|') + ")(s|es|ed|d|ing)?\\b", 'gi');
+  let last = 0, m;
+  while ((m = re.exec(rest))){
+    span.append(document.createTextNode(rest.slice(last, m.index)));
+    const w1 = m[1], base = ep.words.find(x => x.w.toLowerCase() === w1.toLowerCase());
+    const b = el('b', 'kw', m[0]); b.title = base ? base.uz : '';
+    b.onclick = e => { e.stopPropagation(); dnote(b.closest('.dcard'), w1 + ' — ' + (base ? base.uz : '')); speakParts([{ text: w1, rate: 0.85 }]); };
+    span.append(b); last = m.index + m[0].length;
+  }
+  span.append(document.createTextNode(rest.slice(last)));
+  return span;
+}
+let epRate = LS.get('epRate', 0.9);
+function runEpisode(box, ep){
+  box.innerHTML = '';
+  const c = el('div', 'dcard ep');
+  const gOf = s => ep.kind === 'story' ? (wantMale() ? 'male' : 'female') : (s === ep.male ? 'male' : 'female');
+  c.append(el('div', 'dstep', (ep.kind === 'story' ? '📖 Hikoya' : '💬 Dialog') + ` · ${ep.lines.length} gap · ~${Math.max(1, Math.round(ep.lines.reduce((a, l) => a + l.en.split(' ').length, 0) / 120))} daqiqa`), el('div', 'dtitle', ep.title));
+  if (ep.words.length) { const kw = el('div', 'epwords'); kw.append(el('span', 'tl', "O'rgangan so'zlaringiz:")); ep.words.forEach(x => kw.append(el('span', 'tw', x.w))); c.append(kw); }
+  const ctl = el('div', 'drow epctl');
+  let playing = false, run = 0, from = 0, repeatMode = LS.get('epRepeat', false), showUz = false;
+  const playBtn = btn('btn primary', '▶ Tinglash', () => playing ? stop() : play(from));
+  const speedBtn = btn('btn', '🐢 ' + epRate + 'x', () => { epRate = epRate >= 1 ? 0.75 : epRate >= 0.9 ? 1 : 0.9; LS.set('epRate', epRate); speedBtn.textContent = '🐢 ' + epRate + 'x'; });
+  const repBtn = btn('btn' + (repeatMode ? ' on2' : ''), '🔁 Takrorlab', () => { repeatMode = !repeatMode; LS.set('epRepeat', repeatMode); repBtn.classList.toggle('on2', repeatMode); dnote(c, repeatMode ? "Har gapdan keyin pauza bo'ladi: ovoz chiqarib takrorlang (soya mashqi)." : 'Uzluksiz tinglash.'); });
+  const uzBtn = btn('btn', '🇺🇿 Tarjima', () => { showUz = !showUz; list.classList.toggle('showuz', showUz); });
+  ctl.append(playBtn, speedBtn, repBtn, uzBtn); c.append(ctl);
+  const list = el('div', 'eplines');
+  const rows = ep.lines.map((l, i) => {
+    const r = el('div', 'epl ' + (ep.kind === 'story' ? 'n' : l.s === 'A' ? 'a' : 'b'));
+    if (ep.kind !== 'story') r.append(el('div', 'who', ep.names[l.s] || l.s));
+    const t = el('div', 'en'); t.append(lineHtml(l.en, ep)); r.append(t, el('div', 'uz', l.uz));
+    r.onclick = () => { stop(); from = i; play(i, true); };
+    list.append(r); return r;
+  });
+  c.append(list);
+  const mark = i => { rows.forEach((r, k) => r.classList.toggle('cur', k === i)); if (rows[i]) rows[i].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+  function stop(){ playing = false; run++; stopSpeaking(); playBtn.textContent = '▶ Davom ettirish'; }
+  async function play(i, one){
+    const my = ++run; playing = true; playBtn.textContent = '⏸ To\'xtatish';
+    for (let k = i; k < ep.lines.length; k++){
+      if (run !== my) return;
+      from = k; mark(k);
+      await speakParts([{ text: ep.lines[k].en, rate: epRate, g: gOf(ep.lines[k].s) }]);
+      if (run !== my) return;
+      await sleep(repeatMode ? Math.min(6000, 1200 + ep.lines[k].en.split(' ').length * 450) : 250);
+      if (run !== my) return;
+      if (one && !repeatMode) { playing = false; playBtn.textContent = '▶ Davom ettirish'; from = k + 1; return; }
+    }
+    playing = false; from = 0; mark(-1); playBtn.textContent = '▶ Yana tinglash';
+    ep.plays = (ep.plays || 0) + 1; LS.set('episodes', episodes);
+    showQs();
+  }
+  const qs = el('div', 'epqs'); c.append(qs);
+  function showQs(){
+    if (!ep.questions.length || qs.childElementCount) return;
+    qs.append(el('div', 'rh', '❓ Tushundingizmi? (ovoz bilan javob bering)'));
+    ep.questions.forEach(x => {
+      const d = el('div', 'epq'); d.append(el('b', null, x.q), el('div', 'tquz', x.uz));
+      const a = el('div', 'epa', '💡 ' + x.a); a.hidden = true;
+      d.append(btn('tool', 'Javob namunasi', () => { a.hidden = !a.hidden; if (!a.hidden) speakParts([{ text: x.a }]); }), a); qs.append(d);
+    });
+    qs.append(btn('btn primary', '🗣 Suhbatda javob berish', () => {
+      stop(); const q1 = ep.questions[0];
+      turns.push({ role:'assistant', content: JSON.stringify({ emotion:'happy', reply:q1.q, story: ep.lines.map(l => (ep.names[l.s] || '') + ': ' + l.en).join(' ').slice(0, 1100), note:'Then ask: ' + ep.questions.slice(1).map(x => x.q).join(' | ') }) }); saveChat();
+      setRoom('talk'); qMsg({ emotion:'happy', reply:q1.q, reply_uz:q1.uz, praise_uz:'🎧 «' + ep.title + '» bo\'yicha savol' }); speakTurn({ reply:q1.q }, true);
+    }));
+  }
+  if (ep.plays) showQs();
+  const foot = el('div', 'drow'); foot.append(btn('btn', '← Orqaga', () => { stop(); renderEpisodes(box); })); c.append(foot);
+  box.append(c);
+}
+async function newEpisode(box, kind){
+  box.innerHTML = ''; const c = el('div', 'dcard');
+  c.append(el('div', 'dstep', '🎙 Audio dars tayyorlanmoqda… (20-40 soniya)'), el('p', 'note', "O'rgangan so'zlaringiz: " + (studiedWords(12).map(w => w.w).join(', ') || "hali yo'q, oddiy foydali so'zlar ishlatiladi")));
+  box.append(c);
+  try { const ep = await makeEpisode(kind); runEpisode(box, ep); }
+  catch(e){ c.append(el('div', 'dres bad', e.code ? errText(e) : "Tayyorlab bo'lmadi. Qayta urinib ko'ring."), btn('btn primary', 'Qayta', () => newEpisode(box, kind)), btn('btn', 'Orqaga', () => renderEpisodes(box))); }
+}
+function renderEpisodes(box){
+  box.innerHTML = '';
+  const c = el('div', 'dcard');
+  c.append(el('div', 'dtitle', '🎙 Audio dars · 2-3 daqiqa'), el('p', 'note', "Siz o'rgangan so'zlardan dialog yoki hikoya tuziladi. Avval matnsiz tinglang, keyin \"Tarjima\" bilan tekshiring, so'ng \"Takrorlab\" rejimida har gapni ovoz chiqarib qaytaring. Bir darsni 2-3 kun qayta tinglash eng tez natija beradi."));
+  const row = el('div', 'drow'); row.append(btn('btn primary', '💬 Yangi dialog', () => newEpisode(box, 'dialog')), btn('btn primary', '📖 Yangi hikoya', () => newEpisode(box, 'story'))); c.append(row);
+  box.append(c);
+  if (episodes.length){
+    box.append(el('div', 'rh', 'Avvalgi darslar (qayta tinglang)'));
+    episodes.forEach(ep => { const b = btn('dpick', '', () => runEpisode(box, ep)); b.append(el('span', 'dic', ep.kind === 'story' ? '📖' : '💬'), el('b', null, ep.title), el('small', null, `${ep.day} · ${ep.plays || 0} marta tinglangan · ${ep.words.slice(0, 5).map(x => x.w).join(', ')}`)); box.append(b); });
+  }
+  box.append(btn('btn', '← Mashqlarga', renderDrill));
+}
 /* ---- the daily 10-minute lesson ---- */
 const LESSON = [
   { id:'words', ic:'📚', t:"So'zlar", d:'2 daq' },
@@ -1462,6 +1584,7 @@ function renderDrill(){
   c.append(full ? el('div', 'dres good', "✅ Bugungi dars tugadi! Ertaga yana. Xohlasangiz pastdagi mashqlarni qiling.") : btn('btn primary big', l.done.length ? 'Davom ettirish' : 'Boshlash', () => runLesson(box)));
   box.append(c);
   const cards = [
+    ['🎙', 'Audio dars (2-3 daqiqa)', "O'rgangan so'zlaringizdan dialog yoki hikoya: ikki xil ovoz, gapma-gap tarjima, takrorlab tinglash rejimi.", () => renderEpisodes(box)],
     ['⚡', 'Tez tarjima', "O'zbekcha gapni 5 soniyada inglizcha ayting. Gapni tarjima qilmasdan, to'g'ridan-to'g'ri aytishga o'rgatadi.", () => runTranslate(box, 8)],
     ['🦜', 'Soya mashqi', 'Eshiting va darhol takrorlang. Talaffuz va ravonlik uchun eng tez usul.', () => runShadow(box, shadowItems(6))],
     ['🎧', 'Tinglash', "1 daqiqalik hikoya va 2 ta savol. Bot ham har kuni ertalab yuboradi.", () => runListen(box)]

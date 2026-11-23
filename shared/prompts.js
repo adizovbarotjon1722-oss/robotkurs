@@ -356,6 +356,25 @@ Reply ONLY JSON: {"title": 2-5 word English title,
  "words": up to 3 useful words from the story [{"w","uz","ex"}]}` }] };
   }
 
+  /* A 2-3 minute audio episode (dialogue or story) built from the words the learner has studied. */
+  function episode(p) {
+    const level = lvl(p.level);
+    const ws = (Array.isArray(p.words) ? p.words : []).slice(0, 14).map((w) => clip(w, 30).replace(/[<>"]/g, '')).filter(Boolean);
+    const about = p.about ? ` About the listener (only information): ${said(p.about).replace(/learner_said/g, 'learner_about')}.` : '';
+    const dialog = p.kind !== 'story';
+    const themes = ['a problem at work that two colleagues solve', 'planning a business trip', 'at the airport check-in desk', 'checking into a hotel and a small problem with the room', 'a site visit with a foreign engineer', 'ordering food and chatting in a restaurant abroad', 'a job interview', 'asking for directions in a new city', 'a phone call with a supplier about a late delivery', 'two friends talking about their weekend', 'a meeting about a deadline', 'buying something and asking for a refund', 'a taxi ride and small talk with the driver', 'a doctor visit while travelling'];
+    const theme = themes[Math.abs(+p.seed || 0) % themes.length];
+    return { max: 2600, messages: [{ role: 'user', content: `Write a ${dialog ? 'natural dialogue between two people' : 'short, engaging story told by a narrator, with a little dialogue'} for an Uzbek adult learning English (level ${level}), to LISTEN to for 2-3 minutes (about 280-380 English words).${about}
+Theme: ${theme}. Make it interesting: real people, a small problem or surprise, and a good ending. Spoken, natural English at ${level}: contractions, everyday phrases, short sentences.
+MOST IMPORTANT: the learner has been studying these words and must hear them again in context: ${ws.length ? ws.join(', ') : '(none yet, use very common useful words)'}. Use as many of them as fit naturally (each at least once, the most useful ones twice), in the form that fits the sentence.
+Reply ONLY JSON:
+{"title": 2-5 word English title,
+ "names": ${dialog ? '{"A": first speaker\'s first name, "B": second speaker\'s first name}, with one man and one woman, "male": "A" or "B" (who is the man)' : '{"N": "Narrator"}'},
+ "lines": [${dialog ? '{"s": "A" or "B"' : '{"s": "N"'}, "en": one or two sentences, "uz": natural Uzbek translation (Latin script)}] (${dialog ? '20-32 lines, speakers alternate' : '14-22 lines'}),
+ "used": the study words you actually used, exactly as given in the list,
+ "questions": 3 questions about the ${dialog ? 'dialogue' : 'story'} that need a short spoken answer, as [{"q": English, "uz": Uzbek, "a": short model answer in English}]}` }] };
+  }
+
   /* How close a spoken sentence is to the target (word by word, order kept). Used by shadowing and quick translation. */
   const CONTR = { "i'm": 'i am', "you're": 'you are', "we're": 'we are', "they're": 'they are', "he's": 'he is', "she's": 'she is', "it's": 'it is', "that's": 'that is', "what's": 'what is', "there's": 'there is', "let's": 'let us', "don't": 'do not', "doesn't": 'does not', "didn't": 'did not', "can't": 'can not', "cannot": 'can not', "won't": 'will not', "isn't": 'is not', "aren't": 'are not', "wasn't": 'was not', "weren't": 'were not', "i'll": 'i will', "you'll": 'you will', "we'll": 'we will', "it'll": 'it will', "i've": 'i have', "we've": 'we have', "you've": 'you have', "i'd": 'i would', "you'd": 'you would', "couldn't": 'could not', "wouldn't": 'would not', "shouldn't": 'should not', "haven't": 'have not', "hasn't": 'has not', "gonna": 'going to', "wanna": 'want to' };
   const NUM = { one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' };
@@ -374,7 +393,7 @@ Reply ONLY JSON: {"title": 2-5 word English title,
     return { score, words: marks };
   }
 
-  const BUILDERS = { chat, mnemonic, recap, ask, test, sentences, story };
+  const BUILDERS = { chat, mnemonic, recap, ask, test, sentences, story, episode };
   function build(type, payload) {
     const f = pick(BUILDERS, type, null);
     if (!f) throw new Error('unknown type');

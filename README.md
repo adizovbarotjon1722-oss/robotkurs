@@ -112,6 +112,13 @@ So'zlar bo'limida **3000 so'z kursi** bor: eng ko'p ishlatiladigan 3076 ta so'z 
 - **🎧 Tinglash**: 1 daqiqalik hikoya (ish/sayohat mavzusida, darajangizga mos) va 2 ta savol. Bot har kuni birinchi eslatma soatida yuboradi (/tinglash). Javobni suhbatda yoki botga ovozli xabar bilan berasiz.
 - Eslatmalar tartibi: 1-soat tinglash, 2-soat gapirish mashqi, 3-soat so'z testi.
 
+## 🎙 Audio dars: o'rgangan so'zlaringizdan dialog va hikoya
+- Mashq → "Audio dars": AI so'nggi kunlarda takrorlagan so'zlaringizdan 2-3 daqiqalik **dialog** (ikki kishi, erkak va ayol ovozi) yoki **hikoya** tuzadi. Botda: /audio.
+- Gaplar birma-bir ovoz chiqarib o'qiladi va joriy gap belgilanadi. Gapni bossangiz, o'shandan boshlab o'qiladi. O'rgangan so'zlaringiz ajratib ko'rsatiladi, bossangiz ma'nosi chiqadi.
+- 🇺🇿 Tarjima: har gap ostida o'zbekchasi. 🐢 Tezlik: 0.75x / 0.9x / 1x. 🔁 Takrorlab: har gapdan keyin pauza, ovoz chiqarib qaytarasiz (yo'lda soya mashqi).
+- Oxirida 3 ta savol (javob namunasi bilan) va "Suhbatda javob berish". Oxirgi 15 ta dars saqlanadi: bir darsni 2-3 kun qayta tinglash eng tez natija beradi.
+- Ertalabki hikoya (bot, 09:00) ham endi so'nggi o'rgangan so'zlaringizdan tuziladi.
+
 ## Ish va sayohat uchun
 - **Muhandis ishi (10 ta rol o'yini):** stand-up yig'ilish, texnik muammoni tushuntirish, obyektda xorijlik hamkasb, loyiha taqdimoti, muddat kelishuvi, ta'minotchi bilan qo'ng'iroq, chizmani tasvirlash, xavfsizlik brifingi, muhandis intervyusi, hamkasb bilan small talk.
 - **Sayohat (9 ta):** aeroport, mehmonxona, taksi, chipta, yo'qolgan bagaj, dorixona, ekskursiya, kafe, yo'l so'rash.

@@ -182,7 +182,7 @@ async function cmdAbout(msg, user, arg) {
 }
 async function cmdSettings(msg, user) { await say(msg.chat.id, setText(), { reply_markup: setKb(db.getState(user.id).settings) }); }
 async function cmdHelp(msg) {
-  await say(msg.chat.id, "/start — boshlash\n/stats — natijalarim\n/words — bugun takrorlanadigan so'zlar\n/review — so'z yodlash (tugmali test, 5 ta savol)\n/dars — bugungi 10 daqiqalik dars\n/tarjima — tez tarjima mashqi\n/tinglash — 1 daqiqalik hikoya va savollar\n/premium — Premium (Telegram Stars)\n/remind — eslatma soatlari (bot o'zi savol yuboradi)\n/name — hamrohga ism berish\n/settings — javob tili (ikki tilda) va ovoz (ayol/erkak)\n/about — o'zingiz haqingizda (masalan: muhandisman), suhbat shunga moslashadi\n/report — haftalik hisobot (har yakshanba 20:00 da o'zim ham yuboraman)\n\nBotga ovozli yoki matnli xabar yuborsangiz ham, javob beraman. Ismimni yozsangiz yoki aytsangiz, \"Labbay!\" deyman.", { reply_markup: appKeyboard() });
+  await say(msg.chat.id, "/start — boshlash\n/stats — natijalarim\n/words — bugun takrorlanadigan so'zlar\n/review — so'z yodlash (tugmali test, 5 ta savol)\n/dars — bugungi 10 daqiqalik dars\n/audio — o'rgangan so'zlaringizdan 2-3 daqiqalik dialog yoki hikoya\n/tarjima — tez tarjima mashqi\n/tinglash — 1 daqiqalik hikoya va savollar\n/premium — Premium (Telegram Stars)\n/remind — eslatma soatlari (bot o'zi savol yuboradi)\n/name — hamrohga ism berish\n/settings — javob tili (ikki tilda) va ovoz (ayol/erkak)\n/about — o'zingiz haqingizda (masalan: muhandisman), suhbat shunga moslashadi\n/report — haftalik hisobot (har yakshanba 20:00 da o'zim ham yuboraman)\n\nBotga ovozli yoki matnli xabar yuborsangiz ham, javob beraman. Ismimni yozsangiz yoki aytsangiz, \"Labbay!\" deyman.", { reply_markup: appKeyboard() });
 }
 async function cmdAdmin(msg, user, arg) {
   if (!ADMINS.includes(user.id)) return;
@@ -371,7 +371,7 @@ async function onTranslateCb(cq, user, act) {
 /* ---------- morning listening: a one-minute story with two questions ---------- */
 async function makeStory(user, st) {
   if (st.story && st.story.day === L.tday() && st.story.en) return st.story;
-  const out = await S.runAI(user, 'story', { level: (st.settings && st.settings.level) || 'B1', about: st.settings && st.settings.about, words: L.targets(st.words, 5).map((w) => w.w), seed: Math.floor(Math.random() * 100) });
+  const out = await S.runAI(user, 'story', { level: (st.settings && st.settings.level) || 'B1', about: st.settings && st.settings.about, words: L.studied(st.words, 8).map((w) => w.w), seed: Math.floor(Math.random() * 100) });
   const m = out.text.match(/\{[\s\S]*\}/); const r = m ? JSON.parse(m[0]) : null;
   if (!r || !r.en) throw new Error('no story');
   const story = { day: L.tday(), title: String(r.title || 'Story').slice(0, 80), en: String(r.en).slice(0, 1500), uz: String(r.uz || '').slice(0, 2000),
@@ -386,7 +386,7 @@ async function sendStory(chatId, user, intro) {
   const s = await makeStory(user, st);
   const qs = s.questions.map((q, i) => `${i + 1}. <b>${esc(q.q)}</b>\n<tg-spoiler>${esc(q.uz)}</tg-spoiler>`).join('\n');
   const text = (intro ? intro + '\n\n' : '') + `🎧 <b>${esc(s.title)}</b>\n\nAvval matnni ko'rmasdan tinglang (Mini Appda ▶), keyin o'qing:\n<tg-spoiler>${esc(s.en)}</tg-spoiler>\n\n🇺🇿 Tarjimasi:\n<tg-spoiler>${esc(s.uz)}</tg-spoiler>\n\n❓ <b>Savollar</b> (ovozli xabar bilan javob bering):\n${qs}`;
-  await say(chatId, text, { reply_markup: { inline_keyboard: [[appBtn2('🎧 Mini Appda tinglash', 'drill')], [{ text: "🧠 So'z testi (5 ta)", callback_data: 'rv:new:0' }]] } });
+  await say(chatId, text, { reply_markup: { inline_keyboard: [[appBtn2('🎧 Mini Appda tinglash', 'drill')], [appBtn2("🎙 Audio dars: o'rgangan so'zlarimdan dialog (2-3 daq)", 'audio')], [{ text: "🧠 So'z testi (5 ta)", callback_data: 'rv:new:0' }]] } });
   const ch = (st.settings && st.settings.char) || {};
   sendVoiceText(chatId, user, s.en, S.prompts.voiceFor(ch.id, st.settings && st.settings.gender), st.settings && st.settings.style).catch(() => {});
   /* the questions start the bot conversation, so a voice answer is checked with the story in mind */
@@ -438,6 +438,7 @@ async function handleUpdate(u) {
     if (c === 'review' || c === 'takror' || c === 'quiz') return cmdReview(msg, user);
     if (c === 'tarjima' || c === 'translate') return sendTranslate(msg.chat.id, user);
     if (c === 'tinglash' || c === 'listen' || c === 'story') return cmdStory(msg, user);
+    if (c === 'audio' || c === 'dialog' || c === 'podcast') return say(msg.chat.id, "🎙 <b>Audio dars</b> · 2-3 daqiqa\nSiz o'rgangan so'zlardan dialog yoki hikoya tuziladi: ikki xil ovoz, gapma-gap tarjima va takrorlab tinglash rejimi.", { reply_markup: { inline_keyboard: [[appBtn2('🎙 Audio darsni ochish', 'audio')]] } });
     if (c === 'dars' || c === 'lesson') return say(msg.chat.id, "📅 <b>Bugungi dars</b> · 10 daqiqa: so'zlar, soya mashqi, tez tarjima, suhbat va xatolaringiz. Hammasi bitta tugmada:", { reply_markup: { inline_keyboard: [[appBtn2('📅 Darsni boshlash', 'drill')]] } });
     if (c === 'premium') return cmdPremium(msg, user);
     if (c === 'remind') return cmdRemind(msg, user);
@@ -585,7 +586,7 @@ async function setup({ publicUrl, secret, polling }) {
   appUrl = publicUrl;
   await tg('setMyCommands', { commands: [
     { command: 'start', description: 'Boshlash' }, { command: 'stats', description: 'Natijalarim' },
-    { command: 'dars', description: 'Bugungi dars (10 daqiqa)' }, { command: 'review', description: "So'z yodlash (tugmali test)" }, { command: 'tarjima', description: 'Tez tarjima mashqi' }, { command: 'tinglash', description: 'Tinglash: hikoya va savollar' }, { command: 'words', description: "Takrorlash uchun so'zlar" }, { command: 'premium', description: 'Premium (Stars)' },
+    { command: 'dars', description: 'Bugungi dars (10 daqiqa)' }, { command: 'audio', description: "Audio dars: o'rgangan so'zlarimdan dialog" }, { command: 'review', description: "So'z yodlash (tugmali test)" }, { command: 'tarjima', description: 'Tez tarjima mashqi' }, { command: 'tinglash', description: 'Tinglash: hikoya va savollar' }, { command: 'words', description: "Takrorlash uchun so'zlar" }, { command: 'premium', description: 'Premium (Stars)' },
     { command: 'remind', description: 'Eslatma soatlari' }, { command: 'name', description: 'Hamrohga ism berish' }, { command: 'settings', description: 'Javob tili va ovoz (ayol/erkak)' }, { command: 'report', description: 'Haftalik hisobot' }, { command: 'about', description: "O'zim haqimda (suhbat shunga moslashadi)" }, { command: 'help', description: 'Yordam' }] });
   if (appUrl) await tg('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Gaplashish', web_app: { url: appUrl + '/' } } });
   setInterval(() => reminderTick().catch((e) => console.error('remind', e.message)), 5 * 60000).unref();

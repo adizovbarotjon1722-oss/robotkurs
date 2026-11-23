@@ -34,6 +34,8 @@ function quota(user) {
 
 /* a stuck AI hands over to the next one after this long */
 const AI_TIMEOUT = +process.env.AI_TIMEOUT_MS || 25000;
+/* long texts (2-3 minute audio lessons) need more time and room */
+const tmo = (max) => (max > 1500 ? Math.max(AI_TIMEOUT, 70000) : AI_TIMEOUT);
 class ApiError extends Error { constructor(code, status) { super(code); this.code = code; this.status = status || 400; } }
 
 async function withTimeout(url, opts, ms) {
@@ -47,8 +49,8 @@ async function claude(messages, max) {
   const r = await withTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': C.anthropicKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: C.model, max_tokens: Math.min(max || 800, 1200), messages })
-  }, AI_TIMEOUT);
+    body: JSON.stringify({ model: C.model, max_tokens: Math.min(max || 800, 3000), messages })
+  }, tmo(max));
   if (!r.ok) {
     /* only the API's own error text is logged, never the conversation */
     let why = ''; try { const e = await r.json(); why = (e.error && (e.error.type + ': ' + e.error.message)) || ''; } catch (x) {}
@@ -66,8 +68,8 @@ async function gemini(messages, max) {
   const r = await withTimeout('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(C.geminiModel) + ':generateContent', {
     method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': C.geminiKey },
     /* extra room: newer Gemini models spend part of the budget on thinking */
-    body: JSON.stringify({ contents, generationConfig: { maxOutputTokens: Math.max(1024, Math.min((max || 800) * 3, 4096)), responseMimeType: 'application/json', temperature: 0.8 } })
-  }, AI_TIMEOUT);
+    body: JSON.stringify({ contents, generationConfig: { maxOutputTokens: Math.max(1024, Math.min((max || 800) * 3, 8192)), responseMimeType: 'application/json', temperature: 0.8 } })
+  }, tmo(max));
   if (!r.ok) {
     let why = ''; try { const e = await r.json(); why = (e.error && (e.error.status + ': ' + e.error.message)) || ''; } catch (x) {}
     console.error('gemini', r.status, why.slice(0, 300));
@@ -85,12 +87,12 @@ async function gemini(messages, max) {
 /* OpenAI-compatible chat (Groq, Cerebras, OpenRouter, Mistral, OpenAI) */
 async function openaiLike(name, url, key, model, messages, max, json) {
   if (!key) throw new ApiError('not_configured', 503);
-  const body = { model, messages: messages.map((m) => ({ role: m.role, content: String(m.content) })), max_tokens: Math.min(max || 800, 1500), temperature: 0.8 };
+  const body = { model, messages: messages.map((m) => ({ role: m.role, content: String(m.content) })), max_tokens: Math.min(max || 800, 3000), temperature: 0.8 };
   if (json !== false) body.response_format = { type: 'json_object' };
   const r = await withTimeout(url, {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key, 'x-title': 'English Speaking' },
     body: JSON.stringify(body)
-  }, AI_TIMEOUT);
+  }, tmo(max));
   if (!r.ok) {
     let why = ''; try { const e = await r.json(); why = (e.error && (e.error.message || e.error)) || e.message || ''; } catch (x) {}
     console.error(name, r.status, String(why).slice(0, 300));

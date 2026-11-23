@@ -43,6 +43,14 @@ function usedWords(text, tg, aiList) {
   const names = Array.isArray(aiList) ? aiList.map((x) => String(x || '').toLowerCase().trim()) : null;
   return tg.filter((w) => said(text, w.w) && (!names || names.includes(w.w.toLowerCase())));
 }
+/* words studied lately (reviewed in the last week), then today's targets */
+function studied(words, n) {
+  const week = Date.now() - 7 * 864e5, ok = (w) => w && w.w && w.src !== 'pattern' && w.w.length <= 30;
+  const out = [], seen = new Set();
+  (words || []).filter((w) => ok(w) && (w.box || 0) >= 1 && (w.t || 0) > week).sort((a, b) => (b.t || 0) - (a.t || 0))
+    .concat(targets(words, 8)).forEach((w) => { const k = w.w.toLowerCase(); if (!seen.has(k) && out.length < n) { seen.add(k); out.push(w); } });
+  return out;
+}
 function markUsed(w) { w.used = (w.used || 0) + 1; w.usedDay = tday(); grade(w, true); }
 
 /* quiz: 4 meanings, one right, others from the learner's words or the course */
@@ -61,4 +69,4 @@ function reviewList(words, n) {
   return due.concat(more).slice(0, n).map((w) => w.w);
 }
 
-module.exports = { pair, STEPS, grade, isDue, targets, usedWords, markUsed, options, reviewList, tday, coreSize: () => CORE.length };
+module.exports = { studied, pair, STEPS, grade, isDue, targets, usedWords, markUsed, options, reviewList, tday, coreSize: () => CORE.length };

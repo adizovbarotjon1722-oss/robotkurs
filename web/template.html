@@ -199,6 +199,15 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .dpick{display:grid;grid-template-columns:44px 1fr;grid-template-rows:auto auto;column-gap:10px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:18px;padding:12px 14px;color:inherit}
 .dpick .dic{grid-row:1/3;font-size:26px;display:grid;place-items:center}.dpick small{color:var(--muted);font-size:12.5px;line-height:1.35}
 .dstory p{margin:0 0 8px;line-height:1.5}.dqs{margin:0;padding-left:20px;display:grid;gap:6px}
+.epwords{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12px}.epwords .tl{color:var(--muted);font-weight:700}
+.epwords .tw{border:1px dashed var(--teal-deep);color:var(--teal-deep);border-radius:999px;padding:2px 8px;font-weight:700}
+.epctl{position:sticky;top:0;z-index:2;background:var(--surface);padding:4px 0}.btn.on2{background:var(--teal-deep);color:#fff;border-color:var(--teal-deep)}
+.eplines{display:grid;gap:8px}.epl{border-radius:16px;padding:9px 12px;background:var(--surface2);cursor:pointer;transition:background .2s,box-shadow .2s;max-width:92%}
+.epl.b{justify-self:end;background:color-mix(in srgb,var(--teal-deep) 10%,var(--surface))}.epl.n{max-width:100%}
+.epl.cur{box-shadow:0 0 0 2px var(--saffron);background:color-mix(in srgb,var(--saffron) 14%,var(--surface))}
+.epl .who{font-size:11.5px;font-weight:800;color:var(--muted)}.epl .en{font-size:16px;line-height:1.45}.epl .uz{display:none;font-size:13px;opacity:.75;margin-top:3px}
+.eplines.showuz .uz{display:block}.kw{color:var(--teal-deep);text-decoration:underline dotted;cursor:help}
+.epqs{display:grid;gap:8px}.epq{display:grid;gap:4px;border-top:1px dashed var(--line);padding-top:8px}.epa{font-size:14px;color:var(--good)}
 .targets{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:2px 14px 6px;font-size:12.5px}
 .targets .tl{color:var(--muted,#6b7c93);font-weight:700}
 .targets .tw{border:1px dashed var(--teal-deep);background:transparent;color:var(--teal-deep);border-radius:999px;padding:3px 10px;font-weight:700;font-size:12.5px}
