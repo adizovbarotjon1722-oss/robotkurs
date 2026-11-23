@@ -211,6 +211,15 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .epqs{display:grid;gap:8px}.epq{display:grid;gap:4px;border-top:1px dashed var(--line);padding-top:8px}.epa{font-size:14px;color:var(--good)}
 .vtop{font-size:17px;line-height:1;position:relative}.vtop small{position:absolute;bottom:-2px;right:-2px;font-size:9px;font-weight:800;background:var(--surface);border-radius:6px;padding:0 3px;border:1px solid var(--line)}
 #volume{width:100%;accent-color:var(--teal-deep)}
+.fseg{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:6px}.segb{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 6px;font-weight:700;font-size:12.5px;color:inherit;white-space:nowrap}
+.segb.on{background:var(--teal-deep);border-color:var(--teal-deep);color:#fff}
+.focus{font-size:13px;font-weight:700;color:var(--teal-deep);background:color-mix(in srgb,var(--teal-deep) 9%,var(--surface));border-radius:12px;padding:6px 10px}
+.funpick{background:linear-gradient(160deg,color-mix(in srgb,var(--saffron) 16%,var(--surface)),var(--surface))}
+.dpick.done{opacity:.78}.epwords button.tw{background:transparent;cursor:pointer}
+.epl.sl{position:relative;overflow:hidden}.epl .sbar{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--saffron)}
+.yourturn{text-align:center;font-weight:800;font-size:18px;color:var(--rose);animation:yt 1s ease-in-out infinite alternate}
+@keyframes yt{from{transform:scale(1)}to{transform:scale(1.06)}}
+.popsteps{margin:0;padding-left:20px;display:grid;gap:4px;font-size:14px}
 .vtabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
 .vtab{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:8px 4px 10px;display:grid;justify-items:center;gap:2px;position:relative;overflow:hidden;color:inherit}
 .vtab b{font-size:17px}.vtab small{font-size:11px;color:var(--muted)}.vtab i{position:absolute;left:0;bottom:0;height:4px;width:var(--p,0);background:var(--good)}
@@ -339,8 +348,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .empty{color:var(--muted);font-size:14px}
 
 /* bottom nav */
-.nav{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding-block:6px max(10px,env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
-.nav button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;font-weight:700;color:var(--muted);padding:4px;border-radius:14px;position:relative}
+.nav{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding-block:6px max(10px,env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+.nav button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;white-space:nowrap;font-weight:700;color:var(--muted);padding:4px;border-radius:14px;position:relative}
 .nav button svg{width:24px;height:24px}
 .nav button[aria-selected="true"]{color:var(--teal-deep)}
 .nav .badge{position:absolute;top:0;left:calc(50% + 8px);background:var(--rose);color:#fff;border-radius:999px;font-size:10.5px;padding:0 6px;font-variant-numeric:tabular-nums}
@@ -649,6 +658,11 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
     <div class="wscroll"><div id="drill" class="drill"></div></div>
   </section>
 
+  <section class="room" id="room-fun" hidden>
+    <div class="wtop"><div><h2>Ertak va qo'shiqlar</h2><p id="fSub"></p></div></div>
+    <div class="wscroll"><div id="fun" class="drill"></div></div>
+  </section>
+
   <nav class="nav" role="tablist">
     <button role="tab" aria-selected="true" data-room="talk">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Gaplashish
@@ -658,6 +672,9 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
     </button>
     <button role="tab" aria-selected="false" data-room="drill">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>Mashq
+    </button>
+    <button role="tab" aria-selected="false" data-room="fun">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Ertak·Qo'shiq
     </button>
   </nav>
 </div>
@@ -1131,6 +1148,32 @@ Reply ONLY JSON:
  "questions": 3 questions about the ${dialog ? 'dialogue' : 'story'} that need a short spoken answer, as [{"q": English, "uz": Uzbek, "a": short model answer in English}]}` }] };
   }
 
+  /* A fairy tale or fable for listening, at the learner's level, with their studied words. */
+  function tale(p) {
+    const level = lvl(p.level);
+    const ws = (Array.isArray(p.words) ? p.words : []).slice(0, 10).map((w) => clip(w, 30).replace(/[<>"]/g, '')).filter(Boolean);
+    const kinds = ['a funny Nasreddin Afandi story (the clever, funny Uzbek folk hero)', 'a classic animal fable with a clear moral', 'a fairy tale with magic and a happy ending', 'a funny folk tale about a greedy rich man and a clever poor man', 'a modern fable about an engineer, a robot and a lazy computer', 'a funny story about a talking cat who wants to be a boss', 'a tale about three brothers and a magic object', 'a funny story about a donkey who is smarter than his owner'];
+    const kind = kinds[Math.abs(+p.seed || 0) % kinds.length];
+    return { max: 2400, messages: [{ role: 'user', content: `Write ${kind}, ORIGINAL (not a copy of a known modern book), for an Uzbek adult learning English at ${level} level, to listen to for about 2 minutes (180-300 English words). It must be fun, lively and surprising, with short spoken sentences, a narrator and 2 characters who talk. Grammar and words must fit ${level}.${ws.length ? ` Naturally use some of these studied words: ${ws.join(', ')}.` : ''}
+Reply ONLY JSON:
+{"title": 2-6 word English title,
+ "names": {"A": first character's name, "B": second character's name, "male": "A" or "B" (who is male)},
+ "lines": [{"s": "N" for narrator, "A" or "B", "en": one or two sentences, "uz": natural Uzbek translation (Latin script)}] (12-20 lines),
+ "focus": the main grammar point the tale practises, in English, max 6 words,
+ "words": 5 useful words from the tale [{"w": word, "uz": Uzbek}],
+ "questions": 3 questions [{"q": English, "uz": Uzbek, "a": short model answer}]}` }] };
+  }
+
+  /* An original, catchy learning song (a chant on a beat) built from the learner's words. */
+  function song(p) {
+    const level = lvl(p.level);
+    const ws = (Array.isArray(p.words) ? p.words : []).slice(0, 10).map((w) => clip(w, 30).replace(/[<>"]/g, '')).filter(Boolean);
+    const moods = ['a happy, bouncy pop song', 'a funny rap about a bad day at work', 'a cheerful travel song', 'an energetic morning song to wake up', 'a funny song about coffee and deadlines', 'a calm, sweet song about home', 'a football-stadium chant', 'a silly song about a lost suitcase'];
+    const mood = moods[Math.abs(+p.seed || 0) % moods.length];
+    return { max: 1400, messages: [{ role: 'user', content: `Write ${mood}, ORIGINAL lyrics (do not copy any existing song), for an Uzbek adult learning English at ${level} level. 12-16 short lines (4-9 words each), strong rhythm and rhymes, a chorus that repeats twice, easy to chant on a beat. Grammar and words must fit ${level}.${ws.length ? ` Use as many of these studied words as fit: ${ws.join(', ')}.` : ''}
+Reply ONLY JSON: {"title": 2-5 word title, "lines": [{"en": line, "uz": Uzbek translation (Latin script)}], "focus": grammar point, max 6 words, "words": up to 6 [{"w","uz"}]}` }] };
+  }
+
   /* How close a spoken sentence is to the target (word by word, order kept). Used by shadowing and quick translation. */
   const CONTR = { "i'm": 'i am', "you're": 'you are', "we're": 'we are', "they're": 'they are', "he's": 'he is', "she's": 'she is', "it's": 'it is', "that's": 'that is', "what's": 'what is', "there's": 'there is', "let's": 'let us', "don't": 'do not', "doesn't": 'does not', "didn't": 'did not', "can't": 'can not', "cannot": 'can not', "won't": 'will not', "isn't": 'is not', "aren't": 'are not', "wasn't": 'was not', "weren't": 'were not', "i'll": 'i will', "you'll": 'you will', "we'll": 'we will', "it'll": 'it will', "i've": 'i have', "we've": 'we have', "you've": 'you have', "i'd": 'i would', "you'd": 'you would', "couldn't": 'could not', "wouldn't": 'would not', "shouldn't": 'should not', "haven't": 'have not', "hasn't": 'has not', "gonna": 'going to', "wanna": 'want to' };
   const NUM = { one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' };
@@ -1149,7 +1192,7 @@ Reply ONLY JSON:
     return { score, words: marks };
   }
 
-  const BUILDERS = { chat, mnemonic, recap, ask, test, sentences, story, episode };
+  const BUILDERS = { chat, mnemonic, recap, ask, test, sentences, story, episode, tale, song };
   function build(type, payload) {
     const f = pick(BUILDERS, type, null);
     if (!f) throw new Error('unknown type');
@@ -2563,6 +2606,492 @@ window.QumriCore = {
   patterns: [{"uz": "Tanishuv va o'zingiz haqingizda", "list": [{"w": "My name is ...", "uz": "Mening ismim ...", "ex": "My name is Barot.", "trick": "Mening ismim Barot."}, {"w": "I'm from ...", "uz": "Men ...danman", "ex": "I'm from Uzbekistan.", "trick": "Men O'zbekistondanman."}, {"w": "I work as ...", "uz": "Men ... bo'lib ishlayman", "ex": "I work as an engineer.", "trick": "Men muhandis bo'lib ishlayman."}, {"w": "I've been ...ing for ...", "uz": "Men ... vaqtdan beri ...yapman", "ex": "I've been working here for five years.", "trick": "Men bu yerda besh yildan beri ishlayapman."}, {"w": "I'm interested in ...", "uz": "Men ...ga qiziqaman", "ex": "I'm interested in technology.", "trick": "Men texnologiyaga qiziqaman."}, {"w": "I'm good at ...ing", "uz": "Men ...ni yaxshi bilaman", "ex": "I'm good at solving problems.", "trick": "Men muammolarni hal qilishni yaxshi bilaman."}, {"w": "In my free time, I ...", "uz": "Bo'sh vaqtimda men ...", "ex": "In my free time, I read books.", "trick": "Bo'sh vaqtimda kitob o'qiyman."}]}, {"uz": "Savol berish", "list": [{"w": "Do you ...?", "uz": "Siz ...asizmi? (odat)", "ex": "Do you like football?", "trick": "Siz futbolni yoqtirasizmi?"}, {"w": "Are you ...?", "uz": "Siz ...misiz? (holat)", "ex": "Are you ready?", "trick": "Tayyormisiz?"}, {"w": "Have you ever ...?", "uz": "Hech ... ganmisiz?", "ex": "Have you ever been to London?", "trick": "Hech Londonda bo'lganmisiz?"}, {"w": "How long have you ...?", "uz": "Qancha vaqtdan beri ...siz?", "ex": "How long have you lived here?", "trick": "Bu yerda qancha vaqtdan beri yashaysiz?"}, {"w": "How often do you ...?", "uz": "Qanchalik tez-tez ...siz?", "ex": "How often do you travel?", "trick": "Qanchalik tez-tez sayohat qilasiz?"}, {"w": "What do you think about ...?", "uz": "...haqida nima deb o'ylaysiz?", "ex": "What do you think about this plan?", "trick": "Bu reja haqida nima deb o'ylaysiz?"}, {"w": "What kind of ... do you like?", "uz": "Qanday ...ni yoqtirasiz?", "ex": "What kind of music do you like?", "trick": "Qanday musiqani yoqtirasiz?"}, {"w": "How much is/are ...?", "uz": "... qancha turadi?", "ex": "How much is this jacket?", "trick": "Bu kurtka qancha turadi?"}, {"w": "How do I get to ...?", "uz": "...ga qanday boraman?", "ex": "How do I get to the airport?", "trick": "Aeroportga qanday boraman?"}, {"w": "Is there a ... near here?", "uz": "Yaqin atrofda ... bormi?", "ex": "Is there a pharmacy near here?", "trick": "Yaqin atrofda dorixona bormi?"}, {"w": "What time does ... start?", "uz": "... soat nechada boshlanadi?", "ex": "What time does the meeting start?", "trick": "Yig'ilish soat nechada boshlanadi?"}, {"w": "Why don't we ...?", "uz": "Nega ... qilmaymiz? (taklif)", "ex": "Why don't we take a break?", "trick": "Nega tanaffus qilmaymiz?"}]}, {"uz": "Iltimos va taklif", "list": [{"w": "Could you ..., please?", "uz": "Iltimos, ... qila olasizmi?", "ex": "Could you help me, please?", "trick": "Iltimos, menga yordam bera olasizmi?"}, {"w": "Can I ...?", "uz": "...sam bo'ladimi?", "ex": "Can I sit here?", "trick": "Shu yerga o'tirsam bo'ladimi?"}, {"w": "May I ...?", "uz": "... mumkinmi? (rasmiy)", "ex": "May I come in?", "trick": "Kirsam maylimi?"}, {"w": "Would you mind ...ing?", "uz": "...sangiz qarshi emasmisiz?", "ex": "Would you mind opening the window?", "trick": "Derazani ochsangiz qarshi emasmisiz?"}, {"w": "I'd like ...", "uz": "Men ... xohlardim", "ex": "I'd like a cup of tea.", "trick": "Bir piyola choy xohlardim."}, {"w": "I'd like to ...", "uz": "Men ...moqchi edim", "ex": "I'd like to book a room.", "trick": "Xona band qilmoqchi edim."}, {"w": "Let's ...", "uz": "Keling, ...aylik", "ex": "Let's start the meeting.", "trick": "Keling, yig'ilishni boshlaylik."}, {"w": "How about ...ing?", "uz": "...sak-chi?", "ex": "How about going to the cinema?", "trick": "Kinoga borsak-chi?"}, {"w": "Would you like ...?", "uz": "... xohlaysizmi?", "ex": "Would you like some coffee?", "trick": "Qahva xohlaysizmi?"}, {"w": "Do you want me to ...?", "uz": "...ishimni xohlaysizmi?", "ex": "Do you want me to call him?", "trick": "Unga qo'ng'iroq qilishimni xohlaysizmi?"}]}, {"uz": "Fikr bildirish", "list": [{"w": "I think (that) ...", "uz": "Menimcha, ...", "ex": "I think it's a good idea.", "trick": "Menimcha, bu yaxshi fikr."}, {"w": "In my opinion, ...", "uz": "Mening fikrimcha, ...", "ex": "In my opinion, we need more time.", "trick": "Mening fikrimcha, bizga ko'proq vaqt kerak."}, {"w": "I agree with ...", "uz": "Men ... bilan roziman", "ex": "I agree with you.", "trick": "Men siz bilan roziman."}, {"w": "I don't agree because ...", "uz": "Rozi emasman, chunki ...", "ex": "I don't agree because it's too expensive.", "trick": "Rozi emasman, chunki bu juda qimmat."}, {"w": "It seems (that) ...", "uz": "Shekilli, ...", "ex": "It seems that he is busy.", "trick": "Shekilli, u band."}, {"w": "I'm not sure if ...", "uz": "...mi, aniq bilmayman", "ex": "I'm not sure if he's coming.", "trick": "U keladimi, aniq bilmayman."}, {"w": "The problem is (that) ...", "uz": "Muammo shundaki, ...", "ex": "The problem is that we have no time.", "trick": "Muammo shundaki, vaqtimiz yo'q."}, {"w": "The point is ...", "uz": "Gap shundaki, ...", "ex": "The point is, it works.", "trick": "Gap shundaki, u ishlaydi."}, {"w": "It depends on ...", "uz": "Bu ...ga bog'liq", "ex": "It depends on the weather.", "trick": "Bu ob-havoga bog'liq."}, {"w": "To be honest, ...", "uz": "Rostini aytsam, ...", "ex": "To be honest, I'm tired.", "trick": "Rostini aytsam, charchadim."}]}, {"uz": "Vaqt va reja", "list": [{"w": "I'm going to ...", "uz": "Men ...moqchiman (reja)", "ex": "I'm going to visit my parents.", "trick": "Ota-onamnikiga bormoqchiman."}, {"w": "I'm ...ing tomorrow.", "uz": "Ertaga ...yapman (aniq reja)", "ex": "I'm meeting my boss tomorrow.", "trick": "Ertaga boshlig'im bilan uchrashyapman."}, {"w": "I will ...", "uz": "Men ...aman (va'da, qaror)", "ex": "I will call you later.", "trick": "Keyinroq qo'ng'iroq qilaman."}, {"w": "I'm about to ...", "uz": "Hozir ...moqchi turibman", "ex": "I'm about to leave.", "trick": "Hozir chiqib ketmoqchi turibman."}, {"w": "I've just ...", "uz": "Hozirgina ...dim", "ex": "I've just finished the report.", "trick": "Hisobotni hozirgina tugatdim."}, {"w": "I've already ...", "uz": "Allaqachon ...dim", "ex": "I've already eaten.", "trick": "Allaqachon ovqatlandim."}, {"w": "I haven't ... yet.", "uz": "Hali ...maganman", "ex": "I haven't decided yet.", "trick": "Hali qaror qilmaganman."}, {"w": "I used to ...", "uz": "Ilgari ...ardim", "ex": "I used to live in Moscow.", "trick": "Ilgari Moskvada yashardim."}, {"w": "When I was ..., I ...", "uz": "...ligimda men ...", "ex": "When I was a child, I played football.", "trick": "Bolaligimda futbol o'ynardim."}, {"w": "It takes ... to ...", "uz": "...ish uchun ... vaqt ketadi", "ex": "It takes an hour to get there.", "trick": "U yerga borish uchun bir soat ketadi."}, {"w": "By the time ..., I had ...", "uz": "...gan paytda men allaqachon ...gandim", "ex": "By the time he arrived, I had left.", "trick": "U kelganida men allaqachon ketgandim."}, {"w": "As soon as ..., I'll ...", "uz": "...ishim bilanoq ...aman", "ex": "As soon as I arrive, I'll call you.", "trick": "Yetib kelishim bilanoq qo'ng'iroq qilaman."}]}, {"uz": "Majburiyat va maslahat", "list": [{"w": "I have to ...", "uz": "Men ... majburman", "ex": "I have to work late today.", "trick": "Bugun kech ishlashim kerak."}, {"w": "You should ...", "uz": "Siz ... kerak (maslahat)", "ex": "You should see a doctor.", "trick": "Shifokorga ko'rinishingiz kerak."}, {"w": "You'd better ...", "uz": "Yaxshisi, ...", "ex": "You'd better hurry.", "trick": "Yaxshisi, shoshiling."}, {"w": "You don't have to ...", "uz": "... shart emas", "ex": "You don't have to pay.", "trick": "To'lashingiz shart emas."}, {"w": "You mustn't ...", "uz": "... mumkin emas (taqiq)", "ex": "You mustn't smoke here.", "trick": "Bu yerda chekish mumkin emas."}, {"w": "If I were you, I'd ...", "uz": "Sizning o'rningizda bo'lsam, ...ardim", "ex": "If I were you, I'd take the job.", "trick": "Sizning o'rningizda bo'lsam, bu ishni olardim."}, {"w": "It's important to ...", "uz": "...ish muhim", "ex": "It's important to check everything.", "trick": "Hammasini tekshirish muhim."}, {"w": "Make sure (that) ...", "uz": "...ga ishonch hosil qiling", "ex": "Make sure the power is off.", "trick": "Tok o'chirilganiga ishonch hosil qiling."}, {"w": "Don't forget to ...", "uz": "...ni unutmang", "ex": "Don't forget to lock the door.", "trick": "Eshikni qulflashni unutmang."}]}, {"uz": "Shart va sabab", "list": [{"w": "If ..., I'll ...", "uz": "Agar ...sa, ...aman", "ex": "If it rains, I'll stay home.", "trick": "Agar yomg'ir yog'sa, uyda qolaman."}, {"w": "If I had ..., I would ...", "uz": "Agar ...im bo'lganida, ...ardim", "ex": "If I had time, I would help you.", "trick": "Vaqtim bo'lganida, sizga yordam berardim."}, {"w": "Unless ..., ...", "uz": "Agar ... bo'lmasa, ...", "ex": "Unless you hurry, you'll be late.", "trick": "Shoshilmasangiz, kechikasiz."}, {"w": "..., because ...", "uz": "..., chunki ...", "ex": "I'm late because of traffic.", "trick": "Tirbandlik sabab kechikdim."}, {"w": "That's why ...", "uz": "Shuning uchun ...", "ex": "I was ill. That's why I didn't come.", "trick": "Kasal edim. Shuning uchun kelmadim."}, {"w": "..., so ...", "uz": "..., shuning uchun ...", "ex": "It was late, so I took a taxi.", "trick": "Kech edi, shuning uchun taksi oldim."}, {"w": "Although ..., ...", "uz": "Garchi ... bo'lsa ham, ...", "ex": "Although it was hard, we finished.", "trick": "Qiyin bo'lsa ham, tugatdik."}, {"w": "In order to ...", "uz": "...ish uchun", "ex": "I study English in order to travel.", "trick": "Sayohat qilish uchun ingliz tilini o'rganyapman."}]}, {"uz": "Qiyoslash va tasvirlash", "list": [{"w": "... is bigger than ...", "uz": "... ...dan kattaroq", "ex": "This room is bigger than mine.", "trick": "Bu xona menikidan kattaroq."}, {"w": "... is the best ... I've ever ...", "uz": "... men ko'rgan eng yaxshi ...", "ex": "It's the best plov I've ever eaten.", "trick": "Bu men yegan eng mazali palov."}, {"w": "... is as ... as ...", "uz": "... ... kabi ...", "ex": "He is as tall as his father.", "trick": "U otasidek baland."}, {"w": "The more ..., the more ...", "uz": "Qancha ko'p ..., shuncha ko'p ...", "ex": "The more you practise, the better you speak.", "trick": "Qancha ko'p mashq qilsangiz, shuncha yaxshi gapirasiz."}, {"w": "It looks like ...", "uz": "...ga o'xshaydi", "ex": "It looks like rain.", "trick": "Yomg'ir yog'adiganga o'xshaydi."}, {"w": "It's too ... to ...", "uz": "...ish uchun juda ...", "ex": "It's too hot to work.", "trick": "Ishlash uchun juda issiq."}, {"w": "... enough to ...", "uz": "...ish uchun yetarlicha ...", "ex": "He's old enough to drive.", "trick": "U mashina haydash uchun yetarlicha katta."}, {"w": "There is / There are ...", "uz": "... bor", "ex": "There are two meetings today.", "trick": "Bugun ikkita yig'ilish bor."}]}, {"uz": "His-tuyg'u", "list": [{"w": "I'm happy that ...", "uz": "...ganidan xursandman", "ex": "I'm happy that you came.", "trick": "Kelganingizdan xursandman."}, {"w": "I'm sorry for ...", "uz": "... uchun uzr", "ex": "I'm sorry for being late.", "trick": "Kechikkanim uchun uzr."}, {"w": "I'm worried about ...", "uz": "...dan xavotirdaman", "ex": "I'm worried about the deadline.", "trick": "Muddatdan xavotirdaman."}, {"w": "I can't wait to ...", "uz": "...ishni intiqlik bilan kutyapman", "ex": "I can't wait to see you.", "trick": "Sizni ko'rishni intiqlik bilan kutyapman."}, {"w": "I'm looking forward to ...ing", "uz": "...ishni intiqib kutaman", "ex": "I'm looking forward to meeting you.", "trick": "Siz bilan uchrashishni intiqib kutaman."}, {"w": "I feel like ...ing", "uz": "...gim kelyapti", "ex": "I feel like going out.", "trick": "Ko'chaga chiqqim kelyapti."}, {"w": "I'm tired of ...ing", "uz": "...dan charchadim", "ex": "I'm tired of waiting.", "trick": "Kutishdan charchadim."}, {"w": "It's a pity (that) ...", "uz": "Afsus, ...", "ex": "It's a pity you can't come.", "trick": "Afsus, kela olmaysiz."}]}, {"uz": "Ishda", "list": [{"w": "I'm responsible for ...", "uz": "Men ...ga mas'ulman", "ex": "I'm responsible for maintenance.", "trick": "Men texnik xizmatga mas'ulman."}, {"w": "I'm working on ...", "uz": "Men ... ustida ishlayapman", "ex": "I'm working on a new project.", "trick": "Yangi loyiha ustida ishlayapman."}, {"w": "Could you send me ...?", "uz": "Menga ... yubora olasizmi?", "ex": "Could you send me the drawings?", "trick": "Menga chizmalarni yubora olasizmi?"}, {"w": "Let me check and get back to you.", "uz": "Tekshirib, sizga javob beraman", "ex": "Let me check and get back to you.", "trick": "Tekshirib, sizga qayta javob beraman."}, {"w": "We need to ... by ...", "uz": "... gacha ... kerak", "ex": "We need to finish by Friday.", "trick": "Jumagacha tugatishimiz kerak."}, {"w": "The main issue is ...", "uz": "Asosiy muammo — ...", "ex": "The main issue is the pressure.", "trick": "Asosiy muammo — bosim."}, {"w": "What's the status of ...?", "uz": "... qanday holatda?", "ex": "What's the status of the order?", "trick": "Buyurtma qanday holatda?"}, {"w": "I'll take care of it.", "uz": "Buni o'zim hal qilaman", "ex": "Don't worry, I'll take care of it.", "trick": "Xavotir olmang, buni o'zim hal qilaman."}, {"w": "Can we schedule a meeting for ...?", "uz": "...ga yig'ilish belgilay olamizmi?", "ex": "Can we schedule a meeting for Monday?", "trick": "Dushanbaga yig'ilish belgilay olamizmi?"}, {"w": "As far as I know, ...", "uz": "Bilishimcha, ...", "ex": "As far as I know, it's ready.", "trick": "Bilishimcha, u tayyor."}]}, {"uz": "Sayohatda", "list": [{"w": "I have a reservation under ...", "uz": "... nomiga bron bor", "ex": "I have a reservation under Adizov.", "trick": "Adizov nomiga bron bor."}, {"w": "I'm looking for ...", "uz": "Men ...ni qidiryapman", "ex": "I'm looking for the train station.", "trick": "Vokzalni qidiryapman."}, {"w": "Can you show me on the map?", "uz": "Xaritada ko'rsata olasizmi?", "ex": "Can you show me on the map?", "trick": "Xaritada ko'rsata olasizmi?"}, {"w": "How long does it take to ...?", "uz": "...ish qancha vaqt oladi?", "ex": "How long does it take to get to the centre?", "trick": "Markazga borish qancha vaqt oladi?"}, {"w": "Is breakfast included?", "uz": "Nonushta narxga kiradimi?", "ex": "Is breakfast included?", "trick": "Nonushta narxga kiradimi?"}, {"w": "Could you recommend ...?", "uz": "... tavsiya qila olasizmi?", "ex": "Could you recommend a good restaurant?", "trick": "Yaxshi restoran tavsiya qila olasizmi?"}, {"w": "I'd like to pay by ...", "uz": "... bilan to'lamoqchiman", "ex": "I'd like to pay by card.", "trick": "Karta bilan to'lamoqchiman."}, {"w": "Excuse me, is this seat taken?", "uz": "Kechirasiz, bu joy bandmi?", "ex": "Excuse me, is this seat taken?", "trick": "Kechirasiz, bu joy bandmi?"}]}, {"uz": "Suhbatni boshqarish", "list": [{"w": "Sorry, could you repeat that?", "uz": "Kechirasiz, qaytara olasizmi?", "ex": "Sorry, could you repeat that?", "trick": "Kechirasiz, qaytara olasizmi?"}, {"w": "What do you mean by ...?", "uz": "... deganda nimani nazarda tutyapsiz?", "ex": "What do you mean by \"soon\"?", "trick": "\"Tez orada\" deganda nimani nazarda tutyapsiz?"}, {"w": "Could you speak more slowly?", "uz": "Sekinroq gapira olasizmi?", "ex": "Could you speak more slowly, please?", "trick": "Iltimos, sekinroq gapira olasizmi?"}, {"w": "How do you say ... in English?", "uz": "... inglizcha qanday bo'ladi?", "ex": "How do you say \"non\" in English?", "trick": "\"Non\" inglizcha qanday bo'ladi?"}, {"w": "Let me think.", "uz": "O'ylab ko'ray", "ex": "Hmm, let me think.", "trick": "Hmm, o'ylab ko'ray."}, {"w": "What I mean is ...", "uz": "Aytmoqchi bo'lganim ...", "ex": "What I mean is, we need help.", "trick": "Aytmoqchi bo'lganim, bizga yordam kerak."}, {"w": "Anyway, ...", "uz": "Xullas, ...", "ex": "Anyway, let's move on.", "trick": "Xullas, davom etaylik."}]}]
 };
 
+/* Tales and songs for the "Ertak · Qo'shiq" room. All texts are public-domain tales and folk songs, retold or written for learners.
+   Tale: { id, lv, t, ic, fun, focus, names, g (speaker -> male/female), words [[w, uz]], lines [[speaker, en, uz]], qs [[q, uz, a]] }
+   Song: { id, lv, t, ic, fun, focus, bpm, words, lines [[en, uz, notes?]] }  notes: "C4 D4:2 E4:.5" (beats) */
+const FUN = (() => {
+  const TALES = [
+  /* ---------------- A1 ---------------- */
+  { id:'lion', lv:'A1', t:'The Lion and the Mouse', ic:'🦁', focus:'Present simple · can / can\'t', names:{ A:'Lion', B:'Mouse' }, g:{ A:'male', B:'female' },
+    words:[['hungry','och'],['small','kichik'],['help','yordam bermoq'],['catch','tutmoq'],['worry','xavotirlanmoq'],['friend',"do'st"]],
+    lines:[
+      ['N','A big lion is sleeping under a tree.','Katta sher daraxt tagida uxlayapti.'],
+      ['N','A little mouse runs on his nose.','Kichkina sichqon uning burni ustida yuguradi.'],
+      ['N','The lion wakes up. He is very angry.',"Sher uyg'onadi. U juda jahldor."],
+      ['A','I am hungry. I want to eat you!','Men ochman. Seni yemoqchiman!'],
+      ['B','Please, don\'t eat me! I am very small. One day I can help you.','Iltimos, meni yemang! Men juda kichkinaman. Bir kun sizga yordam bera olaman.'],
+      ['A','Ha ha! You are so small. How can you help me? OK, go home.','Ha-ha! Sen juda kichkinasan. Menga qanday yordam berasan? Mayli, uyingga bor.'],
+      ['N','Next week, hunters catch the lion in a big net.',"Keyingi hafta ovchilar sherni katta to'rga tutishadi."],
+      ['A','Help! Help! I can\'t get out!','Yordam bering! Chiqa olmayapman!'],
+      ['N','The little mouse hears him and runs to the net.',"Kichkina sichqon uni eshitadi va to'rga yuguradi."],
+      ['B','Don\'t worry. I can help you!','Xavotir olmang. Men yordam bera olaman!'],
+      ['N','She bites the net again and again. Now there is a big hole.',"U to'rni qayta-qayta tishlaydi. Endi katta teshik bor."],
+      ['A','Thank you, my little friend! Small friends can be great friends.',"Rahmat, kichkina do'stim! Kichik do'stlar ham buyuk do'st bo'la oladi."]],
+    qs:[['Where is the lion sleeping?','Sher qayerda uxlayapti?','Under a tree.'],['How does the mouse help the lion?','Sichqon sherga qanday yordam beradi?','She bites the net and makes a hole.'],['What is the lesson of the story?','Ertakning saboqi nima?','Small friends can be great friends.']] },
+
+  { id:'pigs', lv:'A1', t:'The Three Little Pigs', ic:'🐷', fun:1, focus:'Present simple · let me', names:{ A:'Wolf', B:'Little Pig' }, g:{ A:'male', B:'female' },
+    words:[['build','qurmoq'],['easy','oson'],['slow','sekin'],['fall',"yiqilmoq"],['strong','mustahkam'],['tired','charchagan']],
+    lines:[
+      ['N','Three little pigs leave home. They want to build houses.',"Uchta kichkina cho'chqacha uydan chiqadi. Ular uy qurmoqchi."],
+      ['N','The first pig builds a house of straw. It is fast and easy.',"Birinchi cho'chqacha somondan uy quradi. Bu tez va oson."],
+      ['N','The second pig builds a house of sticks.',"Ikkinchisi cho'plardan uy quradi."],
+      ['N','The third pig builds a house of bricks. It is slow, hard work.',"Uchinchisi g'ishtdan uy quradi. Bu sekin va og'ir ish."],
+      ['N','Then a big bad wolf comes to the straw house.',"Keyin katta yovuz bo'ri somon uyga keladi."],
+      ['A','Little pig, little pig, let me come in!',"Cho'chqacha, cho'chqacha, meni ichkariga kirit!"],
+      ['B','No, no, never!',"Yo'q, yo'q, hech qachon!"],
+      ['A','Then I\'ll huff and I\'ll puff and I\'ll blow your house down!',"Unda puflayman, puflayman va uyingni uchirib yuboraman!"],
+      ['N','Whoosh! The straw house falls. The stick house falls too. The pigs run to the brick house.',"Vush! Somon uy yiqiladi. Cho'p uy ham yiqiladi. Cho'chqachalar g'isht uyga yuguradi."],
+      ['N','The wolf huffs and puffs and puffs. But the brick house doesn\'t fall.',"Bo'ri puflaydi, puflaydi, puflaydi. Lekin g'isht uy yiqilmaydi."],
+      ['A','Oh no! I\'m so tired!','Voy! Juda charchadim!'],
+      ['N','The wolf goes away, and the three pigs sing and dance in their strong house.',"Bo'ri ketadi, uchta cho'chqacha esa mustahkam uyida qo'shiq aytib, raqs tushadi."],
+      ['B','Hard work is good work!',"Og'ir mehnat — yaxshi mehnat!"]],
+    qs:[['What are the three houses made of?','Uchta uy nimadan qurilgan?','Straw, sticks and bricks.'],['Why doesn\'t the brick house fall?',"G'isht uy nega yiqilmaydi?",'Because it is strong.'],['Which pig is the smartest? Why?',"Qaysi cho'chqacha eng aqlli? Nega?",'The third pig, because he works hard.']] },
+
+  { id:'hare', lv:'A1', t:'The Tortoise and the Hare', ic:'🐢', focus:'Present simple · adverbs (fast, slowly)', names:{ A:'Hare', B:'Tortoise' }, g:{ A:'male', B:'female' },
+    words:[['fast','tez'],['race','poyga'],['laugh at','ustidan kulmoq'],['stop',"to'xtamoq"],['already','allaqachon'],['win','yutmoq']],
+    lines:[
+      ['N','The hare is very fast. He likes to laugh at the slow tortoise.',"Quyon juda tez. U sekin toshbaqa ustidan kulishni yaxshi ko'radi."],
+      ['A','You are so slow! You walk like a stone!','Sen juda sekinsan! Tosh kabi yurasan!'],
+      ['B','OK. Let\'s have a race.','Mayli. Keling, poyga qilamiz.'],
+      ['A','A race? With me? Ha ha! OK, let\'s go!','Poyga? Men bilanmi? Ha-ha! Mayli, ketdik!'],
+      ['N','The race starts. The hare runs very fast. The tortoise walks slowly.','Poyga boshlanadi. Quyon juda tez yuguradi. Toshbaqa sekin yuradi.'],
+      ['N','The hare looks back. He can\'t see the tortoise.',"Quyon orqasiga qaraydi. U toshbaqani ko'ra olmaydi."],
+      ['A','I have a lot of time. I can sleep a little.',"Vaqtim ko'p. Biroz uxlasam bo'ladi."],
+      ['N','He sleeps under a tree. The tortoise walks and walks. She never stops.',"U daraxt tagida uxlaydi. Toshbaqa yuradi va yuradi. U hech qachon to'xtamaydi."],
+      ['N','The hare wakes up. The sun is low. He runs to the finish...',"Quyon uyg'onadi. Quyosh botyapti. U marraga yuguradi..."],
+      ['N','But the tortoise is already there! All the animals are clapping.',"Lekin toshbaqa allaqachon o'sha yerda! Hamma hayvonlar qarsak chalyapti."],
+      ['B','Slow and steady wins the race!',"Sekin, lekin to'xtamay yurgan yutadi!"]],
+    qs:[['Why does the hare sleep?','Quyon nega uxlaydi?','Because he thinks he has a lot of time.'],['Who wins the race?','Poygada kim yutadi?','The tortoise wins.'],['What do you do slowly but every day?',"Siz nimani sekin, lekin har kuni qilasiz?",'I study English a little every day.']] },
+
+  { id:'ginger', lv:'A1', t:'The Gingerbread Man', ic:'🍪', fun:1, focus:'Imperatives · can\'t', names:{ A:'Gingerbread Man', B:'Old Woman', C:'Fox' }, g:{ A:'male', B:'female', C:'male' },
+    words:[['run away','qochib ketmoq'],['catch','tutmoq'],['swim','suzmoq'],['river','daryo'],['deep','chuqur'],['trust','ishonmoq'],['delicious','mazali']],
+    lines:[
+      ['N','An old woman makes a gingerbread man. She opens the oven...','Bir kampir pechenye-odamcha yasaydi. U pechni ochadi...'],
+      ['N','And the gingerbread man jumps out and runs away!','Pechenye-odamcha sakrab chiqib, qochib ketadi!'],
+      ['B','Stop! Stop! Come back!',"To'xta! To'xta! Qayt!"],
+      ['A','Run, run, as fast as you can! You can\'t catch me, I\'m the Gingerbread Man!','Yugur, yugur, bor kuching bilan! Meni tutolmaysan, men Pechenye-odamchaman!'],
+      ['N','He runs past a cow, a horse and some farmers. Nobody can catch him.',"U sigir, ot va dehqonlar yonidan yugurib o'tadi. Hech kim uni tutolmaydi."],
+      ['N','Then he comes to a river. He can\'t swim.','Keyin u daryoga yetib keladi. U suzolmaydi.'],
+      ['C','Hello, little man. Jump on my tail. I can take you across.',"Salom, kichkina odam. Dumimga sakra. Seni narigi qirg'oqqa olib o'taman."],
+      ['N','The gingerbread man jumps on the fox\'s tail. The water is deep.','Pechenye-odamcha tulkining dumiga sakraydi. Suv chuqur.'],
+      ['C','Oh, the water is high! Jump on my nose!','Voy, suv baland! Burnimga sakra!'],
+      ['N','He jumps on the fox\'s nose... and SNAP! The fox eats him.','U tulkining burniga sakraydi... va QARS! Tulki uni yeb qo\'yadi.'],
+      ['C','Mmm. Delicious! Never trust a smiling fox!','Mmm. Mazali! Jilmaygan tulkiga hech qachon ishonma!']],
+    qs:[['Who can\'t catch the gingerbread man?','Pechenye-odamchani kim tutolmaydi?','The old woman, a cow, a horse and the farmers.'],['Why does he need the fox?','Unga tulki nega kerak?','Because he can\'t swim.'],['What is the lesson?','Saboq nima?','Don\'t trust everyone.']] },
+
+  { id:'afandi-ring', lv:'A1', t:'Afandi Looks for His Ring', ic:'💍', fun:1, focus:'Present continuous · questions', names:{ A:'Afandi', B:'Neighbour' }, g:{ A:'male', B:'female' },
+    words:[['look for','qidirmoq'],['find','topmoq'],['lose',"yo'qotmoq"],['ring','uzuk'],['dark',"qorong'i"],['light',"yorug'lik"],['neighbour',"qo'shni"]],
+    lines:[
+      ['N','It is night. Afandi is in the street under a lamp. He is looking for something.','Tun. Afandi ko\'chada, chiroq tagida. U nimanidir qidiryapti.'],
+      ['B','Afandi, what are you looking for?','Afandi, nima qidiryapsiz?'],
+      ['A','My ring. It is a gold ring. I can\'t find it.','Uzugimni. Tilla uzuk. Topa olmayapman.'],
+      ['B','Oh no! I can help you.','Voy! Men yordam beraman.'],
+      ['N','They look and look for a long time. They can\'t find the ring.','Ular uzoq qidirishadi. Uzukni topisholmaydi.'],
+      ['B','Afandi, where did you lose it? Here, under the lamp?',"Afandi, uni qayerda yo'qotdingiz? Shu yerda, chiroq tagidami?"],
+      ['A','No, I lost it in my house.',"Yo'q, uyimda yo'qotdim."],
+      ['B','In your house?! Then why are you looking here?','Uyingizdami?! Unda nega bu yerda qidiryapsiz?'],
+      ['A','Because my house is dark. Here there is light!',"Chunki uyim qorong'i. Bu yerda esa yorug'!"],
+      ['N','The neighbour laughs and laughs. Afandi is still looking under the lamp.',"Qo'shni kulaveradi. Afandi esa hali ham chiroq tagida qidiryapti."]],
+    qs:[['What is Afandi looking for?','Afandi nima qidiryapti?','His gold ring.'],['Where did he lose it?',"U uni qayerda yo'qotgan?",'In his house.'],['Why is he looking under the lamp?','Nega chiroq tagida qidiryapti?','Because there is light there.']] },
+
+  /* ---------------- A2 ---------------- */
+  { id:'wolf', lv:'A2', t:'The Boy Who Cried Wolf', ic:'🐺', focus:'Past simple (was, ran, came, did)', names:{ A:'Boy', B:'Villager' }, g:{ A:'male', B:'female' },
+    words:[['bored','zerikkan'],['trick','aldamoq'],['again','yana'],['real','haqiqiy'],['lie',"yolg'on gapirmoq"],['believe','ishonmoq'],['truth','haqiqat']],
+    lines:[
+      ['N','Once there was a young shepherd. Every day he watched the sheep on a hill near his village.',"Bir bor ekan, bir yosh cho'pon bor ekan. U har kuni qishloq yonidagi tepalikda qo'ylarni boqardi."],
+      ['N','He was bored. One day he had an idea.',"U zerikardi. Bir kuni uning xayoliga bir fikr keldi."],
+      ['A','Wolf! Wolf! Help! A wolf is eating the sheep!',"Bo'ri! Bo'ri! Yordam bering! Bo'ri qo'ylarni yeyapti!"],
+      ['N','All the villagers ran up the hill. But there was no wolf.',"Barcha qishloqdoshlar tepalikka yugurib chiqishdi. Lekin bo'ri yo'q edi."],
+      ['A','Ha ha! I tricked you!','Ha-ha! Sizlarni aldadim!'],
+      ['B','That isn\'t funny. Don\'t do it again!','Bu kulgili emas. Boshqa bunday qilma!'],
+      ['N','But the next week he did it again. Again the villagers came, and again there was no wolf.',"Lekin keyingi hafta u yana shunday qildi. Odamlar yana keldi va yana bo'ri yo'q edi."],
+      ['N','Then one evening a real wolf came out of the forest.',"Keyin bir kuni kechqurun o'rmondan haqiqiy bo'ri chiqdi."],
+      ['A','Wolf! Wolf! Please help me! This time it\'s true!',"Bo'ri! Bo'ri! Iltimos, yordam bering! Bu safar rost!"],
+      ['B','He\'s lying again. Let\'s stay at home.',"U yana yolg'on gapiryapti. Uyda qolaylik."],
+      ['N','Nobody came. The wolf chased the sheep away, and the boy cried all night.',"Hech kim kelmadi. Bo'ri qo'ylarni haydab ketdi, bola esa tun bo'yi yig'ladi."],
+      ['B','When you tell lies, people don\'t believe you, even when you tell the truth.',"Yolg'on gapirsang, rost gapirganingda ham odamlar senga ishonmaydi."]],
+    qs:[['Why did the boy shout "Wolf!" the first time?','Bola birinchi marta nega "Bo\'ri!" deb baqirdi?','Because he was bored.'],['Why didn\'t the villagers come at the end?','Oxirida odamlar nega kelmadi?','They thought he was lying again.'],['Tell me about a time when someone didn\'t believe you.','Kimdir sizga ishonmagan bir holat haqida gapiring.','Once I told my friend the truth, but he didn\'t believe me.']] },
+
+  { id:'crow', lv:'A2', t:'The Fox and the Crow', ic:'🦊', fun:1, focus:'Past simple · compliments (You look…)', names:{ A:'Fox', B:'Crow' }, g:{ A:'female', B:'male' },
+    words:[['piece',"bo'lak"],['wonderful','ajoyib'],['proud','faxrlangan'],['voice','ovoz'],['terrible','dahshatli'],['sure','amin, ishonchli']],
+    lines:[
+      ['N','One morning a crow found a big piece of cheese. He flew up into a tree to eat it.',"Bir kuni ertalab qarg'a katta bo'lak pishloq topdi. Uni yeyish uchun daraxtga uchib chiqdi."],
+      ['N','A hungry fox saw him and wanted the cheese.',"Och tulki uni ko'rdi va pishloqni xohladi."],
+      ['A','Good morning, Mr Crow! You look wonderful today!',"Xayrli tong, Qarg'a janoblari! Bugun ajoyib ko'rinyapsiz!"],
+      ['N','The crow said nothing. He held the cheese in his beak.',"Qarg'a hech narsa demadi. U pishloqni tumshug'ida ushlab turdi."],
+      ['A','Your feathers are so shiny and black. You are the most beautiful bird in the forest!',"Patlaringiz juda yaltiroq va qop-qora. Siz o'rmondagi eng chiroyli qushsiz!"],
+      ['A','I\'m sure your voice is beautiful too. Please, sing a song for me!',"Ovozingiz ham chiroyli ekaniga aminman. Iltimos, men uchun bir qo'shiq kuylang!"],
+      ['N','The crow felt very proud. He opened his beak and sang: CAW! CAW! CAW!',"Qarg'a o'zidan juda faxrlandi. U tumshug'ini ochdi va kuyladi: QAR! QAR! QAR!"],
+      ['N','The cheese fell down, and the fox caught it.',"Pishloq pastga tushdi, tulki esa uni ilib oldi."],
+      ['A','Thank you! Your voice is terrible, but your cheese is delicious!',"Rahmat! Ovozingiz dahshatli, lekin pishlog'ingiz mazali!"],
+      ['B','Oh no! I was so stupid!',"Voy! Qanday ahmoq bo'ldim!"],
+      ['N','Remember: don\'t trust people who say too many nice things.',"Yodda tuting: haddan ortiq shirin gap aytadiganlarga ishonmang."]],
+    qs:[['What did the crow find?',"Qarg'a nima topdi?",'A big piece of cheese.'],['Why did the crow open his beak?',"Qarg'a nega tumshug'ini ochdi?",'Because he wanted to sing for the fox.'],['Do you like compliments? Why?','Maqtovni yoqtirasizmi? Nega?','Yes, but I am careful with too many compliments.']] },
+
+  { id:'bears', lv:'A2', t:'Goldilocks and the Three Bears', ic:'🐻', focus:'too + adjective · past simple', names:{ A:'Goldilocks', B:'Father Bear', C:'Baby Bear' }, g:{ A:'female', B:'male', C:'female' },
+    words:[['too hot','juda issiq'],['just right','aynan joyida'],['break','sindirmoq'],['fall asleep','uxlab qolmoq'],['scream','qichqirmoq'],['stranger','begona']],
+    lines:[
+      ['N','Once upon a time, three bears lived in a little house in the forest.',"Bir bor ekan, o'rmondagi kichkina uyda uchta ayiq yashar ekan."],
+      ['N','One morning their porridge was too hot, so they went for a walk.',"Bir kuni ertalab bo'tqalari juda issiq edi, shuning uchun ular sayrga chiqishdi."],
+      ['N','A girl called Goldilocks found the house. The door was open, so she walked in.',"Oltinsoch ismli qiz uyni topib oldi. Eshik ochiq edi, u ichkariga kirdi."],
+      ['A','Mmm, porridge! This one is too hot. This one is too cold. This one is just right!',"Mmm, bo'tqa! Bunisi juda issiq. Bunisi juda sovuq. Bunisi esa aynan joyida!"],
+      ['N','She ate all of Baby Bear\'s porridge. Then she sat on his little chair, and it broke!',"U ayiqchaning bo'tqasini butunlay yeb qo'ydi. Keyin uning kichkina kursisiga o'tirdi va kursi sinib ketdi!"],
+      ['N','She was tired, so she went upstairs and fell asleep in the smallest bed.',"U charchagan edi, yuqoriga chiqib, eng kichik karavotda uxlab qoldi."],
+      ['N','Soon the bears came home.',"Tez orada ayiqlar uyga qaytishdi."],
+      ['B','Somebody ate my porridge!','Kimdir mening bo\'tqamni yebdi!'],
+      ['C','Somebody ate MY porridge, and they broke my chair!',"Kimdir MENING bo'tqamni yebdi, kursimni ham sindiribdi!"],
+      ['C','And look! Somebody is sleeping in my bed!','Qarang! Kimdir karavotimda uxlayapti!'],
+      ['N','Goldilocks woke up, saw three bears and screamed. She jumped out of the window and ran home.',"Oltinsoch uyg'onib, uchta ayiqni ko'rdi va qichqirdi. Derazadan sakrab, uyiga yugurdi."],
+      ['A','I will never go into a stranger\'s house again!',"Begona uyga boshqa hech qachon kirmayman!"]],
+    qs:[['Why did the bears go for a walk?','Ayiqlar nega sayrga chiqishdi?','Because their porridge was too hot.'],['What happened to Baby Bear\'s chair?','Ayiqchaning kursisiga nima bo\'ldi?','It broke.'],['How do you like your tea: too hot, too cold or just right?',"Choyni qanday yoqtirasiz?",'I like it hot, but not too hot.']] },
+
+  { id:'ant', lv:'A2', t:'The Ant and the Grasshopper', ic:'🐜', focus:'should · past simple', names:{ A:'Grasshopper', B:'Ant' }, g:{ A:'male', B:'female' },
+    words:[['carry','tashimoq'],['save',"yig'ib qo'ymoq"],['should','kerak (maslahat)'],['knock','taqillatmoq'],['snow','qor'],['everywhere','hamma joyda']],
+    lines:[
+      ['N','All summer the grasshopper played music and sang in the sun.',"Butun yoz chigirtka quyosh ostida musiqa chalib, qo'shiq aytdi."],
+      ['N','The ant worked hard every day. She carried food to her home.',"Chumoli har kuni tinmay ishladi. U uyiga oziq-ovqat tashidi."],
+      ['A','Why are you working? It\'s summer! Come and dance with me!',"Nega ishlayapsan? Yoz-ku! Kel, men bilan raqs tush!"],
+      ['B','Winter is coming. I need food for the winter. You should save food too.',"Qish kelyapti. Menga qish uchun ovqat kerak. Sen ham ovqat yig'ib qo'yishing kerak."],
+      ['A','Winter? That\'s a long time away. I have lots of food now!',"Qishmi? U hali uzoq. Hozir ovqatim ko'p!"],
+      ['N','Then winter came. It was cold, and there was snow everywhere.',"Keyin qish keldi. Sovuq edi, hamma yoq qor edi."],
+      ['N','The grasshopper had no food. He was hungry and cold. He knocked on the ant\'s door.',"Chigirtkada ovqat yo'q edi. U och va sovqotgan edi. U chumolining eshigini taqillatdi."],
+      ['A','Please, can you give me some food? I\'m so hungry.',"Iltimos, menga ozgina ovqat bera olasanmi? Juda ochman."],
+      ['B','What did you do all summer?','Butun yoz nima qilding?'],
+      ['A','I sang and played music.',"Qo'shiq aytdim va musiqa chaldim."],
+      ['B','Well, come in. You can eat with me. But next summer, you can sing AND work!',"Mayli, kir. Men bilan ovqatlanaver. Lekin keyingi yoz ham kuylaysan, HAM ishlaysan!"],
+      ['N','The next summer, the grasshopper worked in the morning and played music in the evening.',"Keyingi yozda chigirtka ertalab ishladi, kechqurun esa musiqa chaldi."]],
+    qs:[['What did the grasshopper do all summer?','Chigirtka butun yoz nima qildi?','He played music and sang.'],['What should the grasshopper do next summer?','Chigirtka keyingi yoz nima qilishi kerak?','He should work and save food.'],['What should you save for the future?',"Kelajak uchun nimani yig'ib qo'yishingiz kerak?",'I should save some money every month.']] },
+
+  { id:'afandi-coat', lv:'A2', t:'Eat, My Coat, Eat!', ic:'🧥', fun:1, focus:'Past simple · nobody / nothing / everybody', names:{ A:'Afandi', B:'Rich Man' }, g:{ A:'male', B:'male' },
+    words:[['invite','taklif qilmoq'],['wedding',"to'y"],['put on','kiymoq'],['welcome','xush kelibsiz'],['bring','olib kelmoq'],['feed','ovqatlantirmoq'],['nothing','hech narsa']],
+    lines:[
+      ['N','One day a rich man invited people to a big wedding party. Afandi went in his old work clothes.',"Bir kuni bir boy katta to'yga mehmon chaqirdi. Afandi eski ish kiyimida bordi."],
+      ['N','Nobody looked at him. Nobody gave him a seat or any food.',"Unga hech kim qaramadi. Hech kim unga joy ham, ovqat ham bermadi."],
+      ['N','So Afandi went home and put on his best coat. It was long and beautiful.',"Shunda Afandi uyiga borib, eng yaxshi to'nini kiydi. U uzun va chiroyli edi."],
+      ['N','When he came back, everybody smiled at him.',"U qaytib kelganida hamma unga jilmaydi."],
+      ['B','Welcome, welcome, dear Afandi! Please sit here, in the best place!',"Xush kelibsiz, aziz Afandi! Marhamat, to'rga o'ting!"],
+      ['N','The servants brought him hot plov, meat and sweets.',"Xizmatkorlar unga issiq palov, go'sht va shirinliklar olib kelishdi."],
+      ['N','Afandi took some plov and put it on his coat.',"Afandi bir qoshiq palov olib, to'niga qo'ydi."],
+      ['A','Eat, my coat, eat! Have some more!',"Ye, to'nim, ye! Yana ol!"],
+      ['B','Afandi! What are you doing? Why are you feeding your coat?',"Afandi! Nima qilyapsiz? Nega to'ningizni ovqatlantiryapsiz?"],
+      ['A','An hour ago I came in my old clothes, and you gave me nothing. Now I came in this coat, and you gave me everything. So the food is for the coat, not for me!',"Bir soat oldin eski kiyimda keldim, menga hech narsa bermadingiz. Endi shu to'nda keldim, hammasini berdingiz. Demak, ovqat menga emas, to'nga ekan!"],
+      ['N','The rich man\'s face turned red, and everybody laughed.',"Boyning yuzi qizarib ketdi, hamma kulib yubordi."]],
+    qs:[['What did Afandi wear the first time?','Afandi birinchi safar nima kiyib bordi?','His old work clothes.'],['Why did Afandi feed his coat?',"Afandi nega to'nini ovqatlantirdi?",'Because people respected his coat, not him.'],['Do people judge others by their clothes in your city?','Shahringizda odamlarni kiyimiga qarab baholashadimi?','Sometimes yes, but it is not right.']] },
+
+  /* ---------------- B1 ---------------- */
+  { id:'emperor', lv:'B1', t:'The Emperor\'s New Clothes', ic:'👑', fun:1, focus:'so … that · couldn\'t … either', names:{ A:'Emperor', B:'Weaver', C:'Child' }, g:{ A:'male', B:'female', C:'female' },
+    words:[['trickster','firibgar'],['pretend',"o'zini …dek ko'rsatmoq"],['be afraid',"qo'rqmoq"],['either','ham (inkorda)'],['crowd','olomon'],['suddenly','birdan'],['magnificent','hashamatli, ajoyib']],
+    lines:[
+      ['N','Many years ago there was an emperor who loved new clothes more than anything else. He changed his outfit every hour.',"Ko'p yillar oldin yangi kiyimni hamma narsadan ko'proq yaxshi ko'radigan bir imperator bo'lgan ekan. U har soatda kiyimini almashtirardi."],
+      ['N','One day two clever tricksters arrived in the city. They said they were the best weavers in the world.',"Bir kuni shaharga ikki ayyor firibgar keldi. Ular o'zlarini dunyodagi eng zo'r to'quvchilar deyishdi."],
+      ['B','Our cloth is magic. It\'s so beautiful that stupid people can\'t see it at all.',"Bizning matomiz sehrli. U shunchalik chiroyliki, ahmoq odamlar uni umuman ko'ra olmaydi."],
+      ['A','Wonderful! Then I\'ll know who is clever and who is stupid. Make me a suit at once!',"Ajoyib! Unda kim aqlli, kim ahmoqligini bilib olaman. Darhol menga kostyum tikinglar!"],
+      ['N','The emperor gave them bags of gold and silk. They hid it all and pretended to work on empty looms.',"Imperator ularga qop-qop oltin va ipak berdi. Ular hammasini yashirib, bo'sh dastgohlarda ishlayotgandek ko'rsatishdi."],
+      ['N','The emperor sent his ministers to check. They saw nothing, but they were afraid to look stupid.',"Imperator tekshirish uchun vazirlarini yubordi. Ular hech narsa ko'rmadi, lekin ahmoq ko'rinishdan qo'rqishdi."],
+      ['B','Isn\'t the colour lovely? Feel how light it is!',"Rangi ajoyib emasmi? Qarang, qanchalik yengil!"],
+      ['N','Finally the emperor came himself. He couldn\'t see anything either, but he said...',"Nihoyat imperatorning o'zi keldi. U ham hech narsa ko'rmadi, lekin dedi..."],
+      ['A','Magnificent! I\'ll wear it in the parade tomorrow.',"Ajoyib! Ertaga paradda kiyaman."],
+      ['N','The next day the emperor walked through the streets in his "new clothes". Everyone shouted how beautiful they were.',"Ertasiga imperator 'yangi kiyimida' ko'chalardan o'tdi. Hamma ularni baqirib maqtadi."],
+      ['C','But he isn\'t wearing anything!',"Lekin uning ustida hech narsa yo'q-ku!"],
+      ['N','Suddenly the whole crowd started laughing. The emperor knew the child was right, but he kept walking with his head held high.',"Birdan butun olomon kula boshladi. Imperator bola haqligini bildi, lekin boshini baland tutib, yurishda davom etdi."]],
+    qs:[['Why couldn\'t the ministers say the truth?','Vazirlar nega haqiqatni aytolmadi?','Because they were afraid to look stupid.'],['Who said the truth?','Haqiqatni kim aytdi?','A little child.'],['Have you ever pretended to understand something?',"Biror narsani tushungandek ko'rsatganmisiz?",'Yes, once in a meeting I pretended to understand, but later I asked.']] },
+
+  { id:'jack', lv:'B1', t:'Jack and the Beanstalk', ic:'🌱', focus:'so … that · as … as he could', names:{ A:'Jack', B:'Mother', C:'Giant' }, g:{ A:'male', B:'female', C:'male' },
+    words:[['poor','kambag\'al'],['offer','taklif qilmoq'],['deal','savdo, kelishuv'],['grow into','…ga aylanmoq'],['climb','tirmashib chiqmoq'],['hide','yashirinmoq'],['chase','quvmoq']],
+    lines:[
+      ['N','Jack lived with his mother in a small house. They were so poor that they had only one old cow.',"Jek onasi bilan kichkina uyda yashardi. Ular shunchalik kambag'al ediki, faqat bitta qari sigirlari bor edi."],
+      ['B','Jack, take the cow to the market and sell her. Don\'t come back without money!',"Jek, sigirni bozorga olib borib sot. Pulsiz qaytma!"],
+      ['N','On the way, Jack met a strange old man who offered him five magic beans for the cow.',"Yo'lda Jek g'alati bir cholni uchratdi. U sigir evaziga beshta sehrli loviya taklif qildi."],
+      ['A','Magic beans? Sounds like a great deal!',"Sehrli loviya? Zo'r savdo-ku!"],
+      ['B','Beans?! You sold our cow for beans? You silly boy!',"Loviya?! Sigirimizni loviyaga sotdingmi? Ahmoq bola!"],
+      ['N','She threw the beans out of the window. During the night they grew into a giant beanstalk that reached the clouds.',"U loviyalarni derazadan uloqtirdi. Tunda ular bulutlarga yetadigan ulkan poyaga aylandi."],
+      ['N','Jack climbed up and found a castle in the sky. Inside lived a huge giant.',"Jek tepaga tirmashib chiqdi va osmonda qal'a topdi. Ichida ulkan dev yashardi."],
+      ['C','Fee-fi-fo-fum! I smell a human! Where is he?',"Fi-fay-fo-fam! Odam hidi kelyapti! U qayerda?"],
+      ['N','Jack hid in the kitchen. When the giant fell asleep, Jack took a hen that laid golden eggs.',"Jek oshxonaga yashirindi. Dev uxlab qolganda, Jek oltin tuxum qo'yadigan tovuqni oldi."],
+      ['N','The hen clucked, the giant woke up and chased him. Jack climbed down as fast as he could.',"Tovuq qaqilladi, dev uyg'onib, uni quvdi. Jek bor kuchi bilan pastga tushdi."],
+      ['A','Mother! Bring me the axe, quick!',"Ona! Boltani olib keling, tez!"],
+      ['N','Jack cut down the beanstalk, and the giant fell with a terrible crash. From then on, Jack and his mother were never poor again.',"Jek poyani chopib tashladi, dev dahshatli gumburlab yiqildi. Shundan beri Jek va onasi hech qachon kambag'al bo'lishmadi."]],
+    qs:[['Why was Jack\'s mother angry?','Jekning onasi nega jahli chiqdi?','Because he sold the cow for beans.'],['What did Jack take from the giant?','Jek devdan nimani oldi?','A hen that laid golden eggs.'],['Tell me about a good or bad deal you made.',"Qilgan yaxshi yoki yomon savdoingiz haqida gapiring.",'Last year I bought a cheap phone, but it broke after a month.']] },
+
+  { id:'elves', lv:'B1', t:'The Elves and the Shoemaker', ic:'👞', focus:'poorer and poorer · present perfect (I\'ve never seen)', names:{ A:'Shoemaker', B:'Wife' }, g:{ A:'male', B:'female' },
+    words:[['enough','yetarli'],['perfect','mukammal'],['customer','xaridor'],['price','narx'],['find out','bilib olmoq'],['disappear',"g'oyib bo'lmoq"],['luck','omad']],
+    lines:[
+      ['N','There was once a shoemaker who worked very hard, but he was getting poorer and poorer.',"Bir bor ekan, tinmay ishlaydigan bir etikdo'z bo'lgan ekan, lekin u tobora kambag'allashib borardi."],
+      ['N','One evening he had enough leather for only one pair of shoes. He cut it out and went to bed.',"Bir kuni kechqurun unda faqat bir juft poyabzalga yetadigan charm qoldi. U charmni bichib, uxlashga yotdi."],
+      ['N','In the morning he found a beautiful pair of shoes on the table. Every stitch was perfect.',"Ertalab u stol ustida chiroyli bir juft poyabzal topdi. Har bir chok mukammal edi."],
+      ['A','Who could have made these? I\'ve never seen such fine work!',"Bularni kim tikkan bo'lishi mumkin? Bunday nozik ishni hech qachon ko'rmaganman!"],
+      ['N','A customer bought them for a high price, so the shoemaker could buy leather for two pairs.',"Bir xaridor ularni qimmat narxga oldi, endi etikdo'z ikki juftga charm sotib ola oldi."],
+      ['N','The next morning there were two pairs, then four, then eight. Soon the shoemaker was rich.',"Ertasiga ikki juft, keyin to'rt, keyin sakkiz juft paydo bo'ldi. Tez orada etikdo'z boyib ketdi."],
+      ['B','Let\'s stay up tonight and find out who is helping us.',"Bugun kechasi uxlamay, bizga kim yordam berayotganini bilib olaylik."],
+      ['N','At midnight two tiny elves came in. They had no clothes and were shivering, but they sewed and hammered until sunrise.',"Yarim tunda ikki mitti pakana kirib keldi. Ularning kiyimi yo'q edi, titrashardi, lekin quyosh chiqquncha tikib, bolg'a urib ishlashdi."],
+      ['B','Those poor little men! They\'ve helped us so much. Let\'s make them some clothes.',"Bechora mitti odamchalar! Ular bizga juda ko'p yordam berishdi. Keling, ularga kiyim tikib beraylik."],
+      ['N','The wife sewed tiny shirts and coats, and the shoemaker made two tiny pairs of boots.',"Xotini mitti ko'ylak va kamzullar tikdi, etikdo'z esa ikki juft mitti etik yasadi."],
+      ['N','When the elves found the presents, they put them on and danced around the room with joy. Then they disappeared, but the shoemaker\'s luck stayed with him forever.',"Pakanalar sovg'alarni topib, kiyib olishdi va xursandchilikdan xona bo'ylab raqsga tushishdi. Keyin g'oyib bo'lishdi, lekin etikdo'zning omadi bir umr u bilan qoldi."]],
+    qs:[['Why was the shoemaker getting poorer?',"Etikdo'z nega kambag'allashib borardi?",'Because he had little leather and few customers.'],['How did they find out about the elves?','Pakanalar haqida qanday bilib olishdi?','They stayed up at night and watched.'],['How do you thank people who help you?',"Sizga yordam berganlarga qanday minnatdorlik bildirasiz?",'I usually say thank you and help them back.']] },
+
+  { id:'porridge', lv:'B1', t:'The Magic Porridge Pot', ic:'🍲', fun:1, focus:'had to · past perfect (had forgotten)', names:{ A:'Girl', B:'Mother', C:'Old Woman' }, g:{ A:'female', B:'female', C:'female' },
+    words:[['porridge',"bo'tqa"],['while','…ayni paytda'],['forget','unutmoq'],['fill',"to'ldirmoq"],['at last','nihoyat'],['immediately','darhol'],['had to','majbur bo\'ldi']],
+    lines:[
+      ['N','A poor girl lived with her mother. One day in the forest, an old woman gave her a little magic pot.',"Kambag'al bir qiz onasi bilan yashardi. Bir kuni o'rmonda bir kampir unga kichkina sehrli qozon berdi."],
+      ['C','When you say "Cook, little pot, cook!", it will make sweet porridge. When you say "Stop, little pot!", it will stop.',"'Pishir, qozoncha, pishir!' desang, shirin bo'tqa pishiradi. 'To'xta, qozoncha!' desang, to'xtaydi."],
+      ['N','From that day the girl and her mother were never hungry.',"O'sha kundan beri qiz va onasi hech qachon och qolishmadi."],
+      ['N','One morning, while the girl was out, her mother felt hungry.',"Bir kuni ertalab, qiz uyda yo'qligida, onasining qorni ochdi."],
+      ['B','Cook, little pot, cook!','Pishir, qozoncha, pishir!'],
+      ['N','The pot started cooking. Soon her bowl was full, but she had forgotten the magic words to stop it!',"Qozon pishira boshladi. Tez orada kosasi to'ldi, lekin u to'xtatadigan sehrli so'zlarni unutib qo'ygan edi!"],
+      ['B','Enough! Finish! That\'s all! Please, no more!',"Yetarli! Bas! Bo'ldi! Iltimos, boshqa kerak emas!"],
+      ['N','The porridge filled the kitchen, then the house, and then it ran out into the street.',"Bo'tqa oshxonani to'ldirdi, keyin uyni, keyin ko'chaga oqib chiqdi."],
+      ['N','It filled the next house and the whole street. People had to eat their way through it!',"U qo'shni uyni va butun ko'chani to'ldirdi. Odamlar o'tish uchun bo'tqani yeb yo'l ochishga majbur bo'lishdi!"],
+      ['N','At last the girl came home. She saw a river of porridge and understood immediately.',"Nihoyat qiz uyga qaytdi. U bo'tqa daryosini ko'rib, darhol tushundi."],
+      ['A','Stop, little pot!',"To'xta, qozoncha!"],
+      ['N','The pot stopped. But after that, anyone who wanted to come into town had to eat their way in!',"Qozon to'xtadi. Lekin shundan keyin shaharga kirmoqchi bo'lgan har kim bo'tqani yeb kirishi kerak edi!"]],
+    qs:[['What were the two magic sentences?','Ikki sehrli gap qanday edi?','"Cook, little pot, cook!" and "Stop, little pot!"'],['Why couldn\'t the mother stop the pot?',"Ona nega qozonni to'xtata olmadi?",'Because she had forgotten the words.'],['What would you ask a magic pot to cook?',"Sehrli qozondan nima pishirib berishini so'ragan bo'lardingiz?",'I would ask it to cook plov every Friday.']] },
+
+  { id:'afandi-pot', lv:'B1', t:'The Pot That Had a Baby', ic:'🫕', fun:1, focus:'could · belong to · reported belief', names:{ A:'Afandi', B:'Neighbour' }, g:{ A:'male', B:'male' },
+    words:[['borrow','qarzga olmoq'],['greedy','xasis'],['return','qaytarmoq'],['belong to','…ga tegishli bo\'lmoq'],['any time','istalgan vaqt'],['ridiculous',"bema'ni"]],
+    lines:[
+      ['N','One day Afandi borrowed a big cooking pot from his rich neighbour. The neighbour was very greedy.',"Bir kuni Afandi boy qo'shnisidan katta qozon qarzga oldi. Qo'shni juda xasis edi."],
+      ['N','A few days later Afandi returned it, and inside the big pot there was a tiny little pot.',"Bir necha kundan keyin Afandi uni qaytardi, katta qozon ichida esa mitti bir qozoncha bor edi."],
+      ['B','What\'s this small pot, Afandi?','Bu kichkina qozon nima, Afandi?'],
+      ['A','Good news! While your pot was at my house, it gave birth to a baby. Of course, the baby belongs to you.',"Xushxabar! Qozoningiz menikida turganda tug'ib qo'ydi. Albatta, bolasi sizniki."],
+      ['N','The neighbour thought Afandi was crazy, but he happily took both pots.',"Qo'shni Afandini aqldan ozgan deb o'yladi, lekin ikkala qozonni ham xursand bo'lib oldi."],
+      ['B','What a wonderful pot! Come and borrow it any time you like.',"Qanday ajoyib qozon! Xohlagan vaqtingizda kelib olavering."],
+      ['N','A month later Afandi borrowed the pot again. This time weeks went by, and he didn\'t bring it back.',"Bir oydan keyin Afandi qozonni yana qarzga oldi. Bu safar haftalar o'tdi, lekin u qozonni qaytarmadi."],
+      ['B','Afandi, where\'s my pot? I need it for a wedding.',"Afandi, qozonim qani? To'y uchun kerak."],
+      ['A','I\'m very sorry to tell you this... your poor pot has died.',"Buni aytishga juda afsusdaman... bechora qozoningiz vafot etdi."],
+      ['B','Died?! Don\'t be ridiculous! A pot can\'t die!',"Vafot etdi?! Bema'ni gapirmang! Qozon o'lmaydi-ku!"],
+      ['A','Strange. You believed that a pot could have a baby, but you can\'t believe that it can die?',"G'alati. Qozon tug'ishiga ishondingiz-u, o'lishiga ishonolmaysizmi?"],
+      ['N','The greedy neighbour had nothing to say. And Afandi cooked plov in that pot for many years.',"Xasis qo'shni hech narsa deya olmadi. Afandi esa ko'p yillar o'sha qozonda palov damladi."]],
+    qs:[['What did Afandi return the first time?','Afandi birinchi safar nimani qaytardi?','The big pot with a tiny pot inside.'],['Why did the neighbour believe the first story?',"Qo'shni nega birinchi gapga ishondi?",'Because he was greedy and got a free pot.'],['What is the funniest Afandi story you know?',"Siz bilgan eng kulgili Afandi latifasi qaysi?",'I like the story where Afandi feeds his coat.']] },
+
+  /* ---------------- B2 ---------------- */
+  { id:'fisher', lv:'B2', t:'The Fisherman and His Wife', ic:'🐟', focus:'would · as if + past perfect', names:{ A:'Fisherman', B:'Wife', C:'Fish' }, g:{ A:'male', B:'female', C:'male' },
+    words:[['miserable','ayanchli'],['astonishment','hayrat'],['release',"qo'yib yubormoq"],['grant a wish','tilakni bajarmoq'],['dissatisfied','norozi'],['deserve',"loyiq bo'lmoq"],['furious',"g'azabli"],['as if',"go'yo"]],
+    lines:[
+      ['N','A poor fisherman lived with his wife in a miserable little hut by the sea.',"Kambag'al bir baliqchi xotini bilan dengiz bo'yidagi ayanchli kulbada yashardi."],
+      ['N','One day he caught an enormous fish, which, to his astonishment, began to speak.',"Bir kuni u ulkan baliq tutdi va baliq, uni hayratda qoldirib, gapira boshladi."],
+      ['C','Please let me go. I\'m not really a fish; I\'m an enchanted prince. I\'d taste terrible anyway.',"Iltimos, meni qo'yib yuboring. Men aslida baliq emas, sehrlangan shahzodaman. Baribir ta'mim dahshatli bo'lardi."],
+      ['N','The kind-hearted fisherman released it without asking for anything in return.',"Ko'ngilchan baliqchi evaziga hech narsa so'ramay, uni qo'yib yubordi."],
+      ['B','You let a magic fish go and didn\'t even make a wish? Go back at once and ask for a proper cottage!',"Sehrli baliqni qo'yib yuborib, hatto tilak ham tilamadingmi? Darhol qaytib bor-da, durustroq uy so'ra!"],
+      ['N','The fish granted the wish. But within a week the wife was dissatisfied again.',"Baliq tilakni bajardi. Lekin bir hafta o'tmay xotin yana norozi bo'lib qoldi."],
+      ['B','A cottage? Don\'t be absurd. I deserve a stone castle with servants!',"Uycha? Bema'ni gap. Men xizmatkorlari bor tosh qal'aga loyiqman!"],
+      ['N','Then she wanted to be queen, then empress. Each time, the sea grew darker and the waves grew higher.',"Keyin u qirolicha, so'ng imperatritsa bo'lishni xohladi. Har safar dengiz qorayib, to'lqinlar balandlashib borardi."],
+      ['B','I want to control the sun and the moon. Tell the fish to make me ruler of the whole universe!',"Men quyosh va oyni boshqarmoqchiman. Baliqqa ayt, meni butun olamning hukmdori qilsin!"],
+      ['N','The terrified fisherman went down to the shore. A furious storm was raging.',"Qo'rqib ketgan baliqchi qirg'oqqa tushdi. Shiddatli bo'ron avjiga chiqqan edi."],
+      ['C','Go home. She is back where she started.',"Uyingga qayt. U boshlagan joyiga qaytdi."],
+      ['N','And there was his wife, sitting in the same miserable little hut, as if nothing had ever happened.',"Mana, xotini o'sha ayanchli kulbada o'tiribdi, go'yo hech narsa bo'lmagandek."]],
+    qs:[['How did the wife change after each wish?',"Har bir tilakdan keyin xotin qanday o'zgardi?",'She became more and more greedy.'],['Why did the sea grow darker each time?',"Nega har safar dengiz qorayib borardi?",'It showed that the fish was getting angry.'],['Is it possible to be satisfied with what you have? Explain.',"Bor narsaga qanoat qilish mumkinmi? Tushuntiring.",'I think so, if you focus on what really matters, like family and health.']] },
+
+  { id:'rumpel', lv:'B2', t:'Rumpelstiltskin', ic:'🧵', focus:'First conditional · had nothing left', names:{ A:'Queen', B:'Little Man', C:'King' }, g:{ A:'female', B:'male', C:'male' },
+    words:[['boastful','maqtanchoq'],['spin','yigirmoq'],['have no idea','umuman bilmaslik'],['desperate','umidsiz'],['agree',"rozi bo'lmoq"],['guess','topmoq (taxmin)'],['within','…ichida']],
+    lines:[
+      ['N','A boastful miller once told the king that his daughter could spin straw into gold.',"Maqtanchoq bir tegirmonchi qirolga qizi somonni oltinga aylantira olishini aytdi."],
+      ['C','If that\'s true, she\'ll become my wife. If it\'s a lie, she\'ll be in serious trouble.',"Agar bu rost bo'lsa, u xotinim bo'ladi. Yolg'on bo'lsa, boshiga katta kulfat tushadi."],
+      ['N','The girl was locked in a room full of straw. She sat down and wept, because she had no idea how to do it.',"Qizni somonga to'la xonaga qamashdi. U o'tirib yig'ladi, chunki buni qanday qilishni umuman bilmasdi."],
+      ['B','What will you give me if I spin it for you?',"Agar sen uchun yigirib bersam, menga nima berasan?"],
+      ['N','A strange little man spun all the straw into gold, first for her necklace, then for her ring.',"G'alati pakana hamma somonni oltinga aylantirdi: avval marjoni, keyin uzugi evaziga."],
+      ['N','On the third night she had nothing left to give.',"Uchinchi kechasi unda beradigan hech narsa qolmadi."],
+      ['B','Then promise me your first child when you are queen.',"Unda qirolicha bo'lganingda birinchi farzandingni menga berishga va'da ber."],
+      ['N','Desperate, she agreed. The king married her, and a year later she had a beautiful baby.',"Iloji qolmagan qiz rozi bo'ldi. Qirol unga uylandi, bir yildan so'ng u go'zal chaqaloq ko'rdi."],
+      ['B','I\'ve come for what you promised me. But I\'ll make you a deal: if you can guess my name within three days, you may keep the child.',"Va'da qilgan narsangni olgani keldim. Lekin bir shart: uch kun ichida ismimni topsang, bola senda qoladi."],
+      ['N','On the last night, a messenger saw the little man dancing around a fire and singing: "Nobody knows my name is Rumpelstiltskin!"',"Oxirgi kechasi bir chopar pakananing gulxan atrofida raqsga tushib kuylayotganini ko'rdi: 'Hech kim bilmaydi, ismim Rumpelshtilsxen!'"],
+      ['A','Is your name, perhaps... Rumpelstiltskin?',"Ismingiz, balki... Rumpelshtilsxendir?"],
+      ['N','The little man was so furious that he stamped his foot right through the floor and was never seen again.',"Pakana shunchalik g'azablandiki, oyog'ini polga urib teshib yubordi va boshqa hech qachon ko'rinmadi."]],
+    qs:[['Why was the girl in trouble?',"Qiz nega qiyin ahvolga tushdi?",'Because her father boasted that she could spin straw into gold.'],['How did the queen learn the name?',"Qirolicha ismni qanday bilib oldi?",'A messenger heard the little man singing it.'],['Have you ever promised something and regretted it?',"Biror narsaga va'da berib, keyin afsuslanganmisiz?",'Yes, I once promised to finish a project in a week, which was unrealistic.']] },
+
+  { id:'piper', lv:'B2', t:'The Pied Piper of Hamelin', ic:'🎶', focus:'It was … who (cleft) · regret + -ing', names:{ A:'Mayor', B:'Piper' }, g:{ A:'male', B:'male' },
+    words:[['get rid of','…dan qutulmoq'],['mysterious','sirli'],['appear',"paydo bo'lmoq"],['give your word',"so'z bermoq"],['tune','kuy'],['regret','afsuslanmoq'],['keep a promise',"va'dani bajarmoq"]],
+    lines:[
+      ['N','In the year 1284 the town of Hamelin had a terrible problem: rats. They were everywhere, in kitchens, in cradles, even in the mayor\'s hat.',"1284-yilda Hamelin shahrida dahshatli muammo bor edi: kalamushlar. Ular hamma joyda edi: oshxonada, beshikda, hatto hokimning shlyapasida ham."],
+      ['A','Something must be done! I\'ll pay a thousand gold coins to anyone who gets rid of them.',"Nimadir qilish kerak! Ulardan qutqargan odamga ming oltin tanga to'layman."],
+      ['N','The next day a mysterious stranger appeared, dressed in a coat of red and yellow, with a small pipe.',"Ertasiga qizil-sariq to'n kiygan, qo'lida kichkina nay bor sirli notanish paydo bo'ldi."],
+      ['B','I can rid your town of every single rat. Do we have a deal?',"Shahringizni har bir kalamushdan xalos qila olaman. Kelishdikmi?"],
+      ['A','Absolutely. You have my word.',"Albatta. So'z beraman."],
+      ['N','The piper began to play a strange, sweet tune. Rats poured out of every house and followed him to the river, where they all drowned.',"Naychi g'alati, shirin kuy chala boshladi. Kalamushlar har bir uydan oqib chiqib, uning ortidan daryoga ergashdi va hammasi cho'kib ketdi."],
+      ['B','The job is done. Now, my thousand coins, please.',"Ish bajarildi. Endi ming tangamni bering."],
+      ['A','A thousand? For playing a little tune? Here\'s fifty. Take it or leave it.',"Mingta? Bir kuy chalganing uchunmi? Mana ellikta. Olsang ol, olmasang yo'q."],
+      ['B','You\'ll regret breaking your promise.',"Va'dangizni buzganingizdan afsuslanasiz."],
+      ['N','He raised his pipe and played a new melody. This time it was the children who came running, laughing and dancing behind him.',"U naychasini ko'tarib, yangi kuy chaldi. Bu safar uning ortidan kulib, raqsga tushib yugurib kelganlar bolalar edi."],
+      ['N','He led them into the mountains, where a door opened in the rock. They all went inside, and the door closed behind them.',"U ularni tog'larga olib bordi, qoyada eshik ochildi. Hammasi ichkariga kirdi va eshik ortlaridan yopildi."],
+      ['N','Only one boy, who couldn\'t keep up, came back to tell the story. Since that day, Hamelin has always kept its promises.',"Faqat yetib ololmagan bir bola qaytib kelib, voqeani aytib berdi. O'sha kundan beri Hamelin doim va'dasiga vafo qiladi."]],
+    qs:[['What did the mayor promise?',"Hokim nimani va'da qildi?",'A thousand gold coins to anyone who got rid of the rats.'],['Why did the piper take the children?',"Naychi nega bolalarni olib ketdi?",'Because the mayor broke his promise.'],['Why is keeping promises important in business?',"Biznesda va'dani bajarish nega muhim?",'Because trust is hard to build and easy to lose.']] },
+
+  { id:'goose', lv:'B2', t:'The Golden Goose', ic:'🪿', fun:1, focus:'whoever · the moment … · may be', names:{ A:'Hans', B:'Princess', C:'King' }, g:{ A:'male', B:'female', C:'male' },
+    words:[['consider','hisoblamoq'],['share',"baham ko'rmoq"],['in return','evaziga'],['resist','chidab turmoq'],['get stuck','yopishib qolmoq'],['meanwhile','bu orada'],['stumble','qoqilmoq'],['impressive',"ta'sirli"]],
+    lines:[
+      ['N','There was once a young man called Hans, whom everyone considered a fool. His older brothers never shared anything with him.',"Bir bor ekan, hamma ahmoq deb hisoblaydigan Hans ismli yigit bo'lgan ekan. Akalari u bilan hech narsani baham ko'rishmasdi."],
+      ['N','One day in the forest he shared his dry bread with a hungry old man. In return, the old man showed him a tree with a goose of pure gold under it.',"Bir kuni o'rmonda u quruq nonini och chol bilan baham ko'rdi. Evaziga chol unga tagida sof oltin g'oz turgan daraxtni ko'rsatdi."],
+      ['N','Hans took the goose and stayed the night at an inn. The innkeeper\'s daughter couldn\'t resist taking a golden feather, but the moment she touched it, her hand got stuck.',"Hans g'ozni olib, karvonsaroyda tunadi. Karvonsaroy egasining qizi oltin pat olishga chiday olmadi, lekin tegishi bilan qo'li yopishib qoldi."],
+      ['N','Her sister tried to pull her free and got stuck to her. Then a teacher, a farmer and a baker all got stuck in a long, ridiculous line.',"Singlisi uni tortib ajratmoqchi bo'ldi va o'zi ham yopishib qoldi. Keyin o'qituvchi, dehqon va novvoy ham uzun, kulgili qatorga yopishib qolishdi."],
+      ['N','Meanwhile, in the city, there lived a princess so serious that she had never laughed in her life.',"Bu orada shaharda umrida bir marta ham kulmagan juda jiddiy malika yashardi."],
+      ['C','Whoever makes my daughter laugh shall marry her!',"Qizimni kuldirgan kishi unga uylanadi!"],
+      ['N','Hans marched past the palace with his goose, followed by seven people stuck together, shouting, stumbling and complaining.',"Hans g'ozi bilan saroy yonidan o'tdi, ortidan bir-biriga yopishgan yetti kishi baqirib, qoqilib, nolib kelardi."],
+      ['B','Ha... ha ha... HA HA HA! Look at them! I can\'t stop laughing!',"Ha... ha-ha... HA-HA-HA! Ularga qarang! Kulgimni to'xtatolmayapman!"],
+      ['C','Well... a promise is a promise. Though I must say, I expected someone a bit more impressive.',"Xo'sh... va'da — va'da. Lekin tan olay, men biroz ta'sirliroq odamni kutgandim."],
+      ['A','Don\'t worry, Your Majesty. I may be simple, but I\'m kind, and I\'ll make her laugh every day.',"Xavotir olmang, hazratim. Men oddiy bo'lishim mumkin, lekin mehribonman va uni har kuni kuldiraman."],
+      ['N','And so the "fool" married the princess, and the people who were stuck were finally set free... after the wedding feast, of course.',"Shunday qilib 'ahmoq' yigit malikaga uylandi, yopishib qolganlar esa nihoyat ozod qilindi... albatta, to'y ziyofatidan keyin."]],
+    qs:[['Why did the old man help Hans?','Chol nega Hansga yordam berdi?','Because Hans shared his bread with him.'],['What made the princess laugh?','Malikani nima kuldirdi?','Seven people stuck to a golden goose, stumbling and shouting.'],['Is kindness more important than being clever? Why?',"Mehribonlik aqllilikdan muhimroqmi? Nega?",'I think kindness opens more doors in the long run.']] },
+
+  { id:'afandi-smell', lv:'B2', t:'The Price of a Smell', ic:'💰', fun:1, focus:'Present perfect continuous · passive (must be paid)', names:{ A:'Afandi', B:'Cook', C:'Poor Man' }, g:{ A:'male', B:'male', C:'male' },
+    words:[['steam',"bug'"],['soften','yumshatmoq'],['owe','qarzdor bo\'lmoq'],['argument','janjal, bahs'],['settle','hal qilmoq'],['justice','adolat'],['receive','olmoq'],['fair','adolatli']],
+    lines:[
+      ['N','One cold morning a poor man was standing outside a cook\'s shop, warming his hands over the steam rising from a pot of soup.',"Bir sovuq tongda kambag'al bir odam oshpaz do'koni oldida, qozondan ko'tarilayotgan sho'rva bug'ida qo'llarini isitib turardi."],
+      ['N','He held his dry bread over the steam to soften it, and ate it slowly.',"U quruq nonini yumshatish uchun bug' ustida tutib, sekin yedi."],
+      ['B','Hey! You\'ve been enjoying the smell of my soup. You owe me money for that!',"Hoy! Sen sho'rvamning hididan rohatlanding. Buning uchun menga pul qarzsan!"],
+      ['C','Pay for a smell? I didn\'t eat anything of yours!',"Hid uchun pul to'laymanmi? Sizning hech narsangizni yemadim-ku!"],
+      ['N','The argument got louder and louder, until they agreed to let Afandi, who happened to be the judge that day, settle the matter.',"Janjal tobora kuchaydi, oxiri ular o'sha kuni tasodifan qozi bo'lgan Afandiga masalani hal qildirishga kelishishdi."],
+      ['A','Hmm. So you\'re saying that the smell of your soup has value?',"Hmm. Demak, sho'rvangizning hidi qimmatga ega demoqchisiz?"],
+      ['B','Of course it does! It took me hours to make that soup.',"Albatta! U sho'rvani pishirishga soatlab vaqt ketdi."],
+      ['A','Very well. Then justice must be done. You, poor man, give me your purse.',"Juda yaxshi. Unda adolat qaror topishi kerak. Siz, bechora, hamyoningizni bering."],
+      ['N','Afandi took the few coins from the purse and shook them right next to the cook\'s ear. Clink, clink, clink.',"Afandi hamyondagi bir necha tangani olib, oshpazning qulog'i yonida silkitdi. Jiring, jiring, jiring."],
+      ['A','There. You have been paid.',"Mana. Sizga to'landi."],
+      ['B','Paid? I haven\'t received a single coin!',"To'landimi? Bitta ham tanga olganim yo'q-ku!"],
+      ['A','It\'s perfectly fair. A man who sells the smell of food must be paid with the sound of money.',"Bu mutlaqo adolatli. Ovqat hidini sotgan odamga pulning ovozi bilan to'lanadi."]],
+    qs:[['Why did the cook want money?',"Oshpaz nega pul so'radi?",'Because the poor man enjoyed the smell of his soup.'],['How did Afandi "pay" the cook?',"Afandi oshpazga qanday 'to'ladi'?",'He let him hear the sound of the coins.'],['Do you think Afandi\'s decision was fair? Why?',"Afandining qarori adolatli bo'ldimi? Nega?",'Yes, because the cook asked for something unfair, so he got an equal answer.']] }
+  ];
+
+  /* Folk songs and nursery rhymes (public domain). Lines with notes can be played as a tune; the rest are chanted on a beat. */
+  const SONGS = [
+  { id:'twinkle', lv:'A1', t:'Twinkle, Twinkle, Little Star', ic:'⭐', focus:'How I wonder … · like a …', bpm:100,
+    words:[['star','yulduz'],['wonder','hayron bo\'lmoq, qiziqmoq'],['above','tepada'],['high','baland'],['diamond','olmos'],['sky','osmon']],
+    lines:[['Twinkle, twinkle, little star,','Miltilla, miltilla, kichik yulduz,','C4 C4 G4 G4 A4 A4 G4:2'],['How I wonder what you are!','Kimligingni bilgim kelar!','F4 F4 E4 E4 D4 D4 C4:2'],['Up above the world so high,','Dunyo uzra baland-baland,','G4 G4 F4 F4 E4 E4 D4:2'],['Like a diamond in the sky.','Osmondagi olmos kabi.','G4 G4 F4 F4 E4 E4 D4:2'],['Twinkle, twinkle, little star,','Miltilla, miltilla, kichik yulduz,','C4 C4 G4 G4 A4 A4 G4:2'],['How I wonder what you are!','Kimligingni bilgim kelar!','F4 F4 E4 E4 D4 D4 C4:2']] },
+  { id:'birthday', lv:'A1', t:'Happy Birthday', ic:'🎂', fun:1, focus:'Wishes: Happy … to you', bpm:110,
+    words:[['birthday',"tug'ilgan kun"],['dear','aziz'],['happy','baxtli']],
+    lines:[['Happy birthday to you,',"Tug'ilgan kuning bilan,",'G4:.75 G4:.25 A4 G4 C5 B4:2'],['Happy birthday to you,',"Tug'ilgan kuning bilan,",'G4:.75 G4:.25 A4 G4 D5 C5:2'],['Happy birthday, dear Anna,',"Tug'ilgan kuning bilan, aziz Anna,",'G4:.75 G4:.25 G5 E5 C5 B4 A4:2'],['Happy birthday to you!',"Tug'ilgan kuning bilan!",'F5:.75 F5:.25 E5 C5 D5 C5:3']] },
+  { id:'lamb', lv:'A1', t:'Mary Had a Little Lamb', ic:'🐑', focus:'Past simple: had, went, was', bpm:120,
+    words:[['lamb',"qo'zichoq"],['fleece','jun'],['white','oq'],['snow','qor'],['everywhere','hamma joyda'],['sure','albatta']],
+    lines:[['Mary had a little lamb,',"Meri bor edi bir qo'zichoq,",'E4 D4 C4 D4 E4 E4 E4:2'],['Little lamb, little lamb,',"Qo'zichoq, qo'zichoq,",'D4 D4 D4:2 E4 G4 G4:2'],['Mary had a little lamb,',"Meri bor edi bir qo'zichoq,",'E4 D4 C4 D4 E4 E4 E4'],['Its fleece was white as snow.',"Juni qordek oppoq edi.",'E4 D4 D4 E4 D4 C4:4'],['Everywhere that Mary went,',"Meri qayga borsa,",'E4 D4 C4 D4 E4 E4 E4:2'],['Mary went, Mary went,','Borsa, borsa,','D4 D4 D4:2 E4 G4 G4:2'],['Everywhere that Mary went,',"Meri qayga borsa,",'E4 D4 C4 D4 E4 E4 E4'],['The lamb was sure to go.',"Qo'zichoq ham ergashardi.",'E4 D4 D4 E4 D4 C4:4']] },
+  { id:'row', lv:'A1', t:'Row, Row, Row Your Boat', ic:'🚣', focus:'Imperatives · adverbs (gently, merrily)', bpm:96,
+    words:[['row',"eshkak eshmoq"],['boat','qayiq'],['gently','sekin, mayin'],['stream','soy, oqim'],['merrily','quvnoq'],['dream','tush']],
+    lines:[['Row, row, row your boat,',"Esh, esh, qayig'ingni esh,",'C4:1.5 C4:1.5 C4 D4:.5 E4:1.5'],['Gently down the stream.',"Oqim bo'ylab sekin-sekin.",'E4 D4:.5 E4 F4:.5 G4:3'],['Merrily, merrily, merrily, merrily,','Quvnoq, quvnoq, quvnoq, quvnoq,','C5:.5 C5:.5 C5:.5 G4:.5 G4:.5 G4:.5 E4:.5 E4:.5 E4:.5 C4:.5 C4:.5 C4:.5'],['Life is but a dream.',"Hayot — bir shirin tush.",'G4 F4:.5 E4 D4:.5 C4:3']] },
+  { id:'farm', lv:'A1', t:'Old MacDonald Had a Farm', ic:'🐄', fun:1, focus:'Animals · here / there / everywhere', bpm:132,
+    words:[['farm','ferma'],['cow','sigir'],['duck',"o'rdak"],['here','bu yerda'],['there','u yerda'],['everywhere','hamma joyda']],
+    lines:[['Old MacDonald had a farm,','Qari Makdonaldning fermasi bor edi,','C4 C4 C4 G3 A3 A3 G3:2'],['E-I-E-I-O!','I-ay-i-ay-o!','E4 E4 D4 D4 C4:3'],['And on his farm he had a cow,','Fermasida sigiri bor edi,','G3 C4 C4 C4 G3 A3 A3 G3:2'],['E-I-E-I-O!','I-ay-i-ay-o!','E4 E4 D4 D4 C4:3'],['With a moo moo here and a moo moo there,','Bu yerda mu-mu, u yerda mu-mu,','G3:.5 G3:.5 C4 C4 C4:2 G3:.5 G3:.5 C4 C4 C4:2'],['Here a moo, there a moo, everywhere a moo moo,','Bu yerda mu, u yerda mu, hamma joyda mu-mu,','C4:.5 C4:.5 C4 C4:.5 C4:.5 C4 C4:.5 C4:.5 C4:.5 C4:.5 C4 C4'],['Old MacDonald had a farm,','Qari Makdonaldning fermasi bor edi,','C4 C4 C4 G3 A3 A3 G3:2'],['E-I-E-I-O!','I-ay-i-ay-o!','E4 E4 D4 D4 C4:3'],['And on his farm he had a duck,',"Fermasida o'rdagi bor edi,",'G3 C4 C4 C4 G3 A3 A3 G3:2'],['E-I-E-I-O!','I-ay-i-ay-o!','E4 E4 D4 D4 C4:3'],['With a quack quack here and a quack quack there,','Bu yerda g\'aq-g\'aq, u yerda g\'aq-g\'aq,','G3:.5 G3:.5 C4 C4 C4:2 G3:.5 G3:.5 C4 C4 C4:2'],['Old MacDonald had a farm, E-I-E-I-O!','Qari Makdonaldning fermasi bor edi, i-ay-i-ay-o!','C4 C4 C4 G3 A3 A3 G3:2 E4 E4 D4 D4 C4:3']] },
+  { id:'john', lv:'A1', t:'Are You Sleeping, Brother John?', ic:'🔔', focus:'Present continuous questions', bpm:110,
+    words:[['sleeping','uxlayapti'],['brother','aka, uka'],['morning','ertalab'],['bell',"qo'ng'iroq"],['ring',"jiringlamoq"]],
+    lines:[['Are you sleeping, are you sleeping,','Uxlayapsanmi, uxlayapsanmi,','C4 D4 E4 C4 C4 D4 E4 C4'],['Brother John, Brother John?','Jon aka, Jon aka?','E4 F4 G4:2 E4 F4 G4:2'],['Morning bells are ringing, morning bells are ringing,',"Tonggi qo'ng'iroqlar chalinyapti, chalinyapti,",'G4:.5 A4:.5 G4:.5 F4:.5 E4 C4 G4:.5 A4:.5 G4:.5 F4:.5 E4 C4'],['Ding, dang, dong. Ding, dang, dong.','Ding, dang, dong. Ding, dang, dong.','C4 G3 C4:2 C4 G3 C4:2']] },
+  { id:'head', lv:'A1', t:'Head, Shoulders, Knees and Toes', ic:'🙆', fun:1, focus:'Body parts', bpm:118,
+    words:[['head','bosh'],['shoulders','yelkalar'],['knees','tizzalar'],['toes',"oyoq barmoqlari"],['ears','quloqlar'],['mouth','og\'iz'],['nose','burun']],
+    lines:[['Head, shoulders, knees and toes, knees and toes!',"Bosh, yelka, tizza, barmoq, tizza, barmoq!"],['Head, shoulders, knees and toes, knees and toes!',"Bosh, yelka, tizza, barmoq, tizza, barmoq!"],['And eyes and ears and mouth and nose,',"Ko'z, quloq, og'iz, burun,"],['Head, shoulders, knees and toes, knees and toes!',"Bosh, yelka, tizza, barmoq, tizza, barmoq!"]] },
+  { id:'happy', lv:'A1', t:'If You\'re Happy and You Know It', ic:'👏', fun:1, focus:'First conditional (if + present) · actions', bpm:116,
+    words:[['clap your hands','qarsak chalmoq'],['stomp your feet','oyoq tepmoq'],['shout','baqirmoq'],['surely','albatta'],['show',"ko'rsatmoq"]],
+    lines:[['If you\'re happy and you know it, clap your hands! (clap clap)',"Agar xursand bo'lsang, qarsak chal! (qars-qars)"],['If you\'re happy and you know it, clap your hands! (clap clap)',"Agar xursand bo'lsang, qarsak chal!"],['If you\'re happy and you know it, then your face will surely show it,',"Xursandligingni bilsang, yuzing albatta ko'rsatadi,"],['If you\'re happy and you know it, clap your hands! (clap clap)',"Agar xursand bo'lsang, qarsak chal!"],['If you\'re happy and you know it, stomp your feet! (stomp stomp)',"Agar xursand bo'lsang, oyog'ingni tep! (tap-tap)"],['If you\'re happy and you know it, shout "Hooray!" (Hooray!)',"Agar xursand bo'lsang, 'Ura!' deb baqir! (Ura!)"]] },
+  { id:'bus', lv:'A1', t:'The Wheels on the Bus', ic:'🚌', fun:1, focus:'Present simple · sounds (swish, beep)', bpm:120,
+    words:[['wheels',"g'ildiraklar"],['round','aylana'],['town','shahar'],['wipers',"oyna tozalagich"],['horn','signal'],['up and down','tepaga-pastga']],
+    lines:[['The wheels on the bus go round and round,',"Avtobus g'ildiragi aylanar-aylanar,",'C4 F4 F4 F4 F4 A4 C5 A4 F4'],['Round and round, round and round.','Aylanar, aylanar.','G4 E4 C4:2 C5 A4 F4:2'],['The wheels on the bus go round and round,',"Avtobus g'ildiragi aylanar-aylanar,",'C4 F4 F4 F4 F4 A4 C5 A4 F4'],['All through the town!',"Butun shahar bo'ylab!",'G4:2 C4 C4 F4:2'],['The wipers on the bus go swish, swish, swish,',"Avtobus tozalagichi shuv, shuv, shuv,",'C4 F4 F4 F4 F4 F4 A4 C5 A4 F4'],['The horn on the bus goes beep, beep, beep,','Avtobus signali bip, bip, bip,','C4 F4 F4 F4 F4 A4 C5 A4 F4'],['The people on the bus go up and down,',"Avtobusdagi odamlar tepaga-pastga,",'C4 F4 F4 F4 F4 F4 A4 C5 A4 F4'],['All through the town!',"Butun shahar bo'ylab!",'G4:2 C4 C4 F4:2']] },
+
+  { id:'london', lv:'A2', t:'London Bridge Is Falling Down', ic:'🌉', focus:'Present continuous · build it up with …', bpm:116,
+    words:[['bridge',"ko'prik"],['fall down','qulamoq'],['build up','qurmoq'],['iron','temir'],['bar','sterjen, tayoq'],['lady','xonim']],
+    lines:[['London Bridge is falling down,',"London ko'prigi qulayapti,",'G4:1.5 A4:.5 G4 F4 E4 F4 G4:2'],['Falling down, falling down.','Qulayapti, qulayapti.','D4 E4 F4:2 E4 F4 G4:2'],['London Bridge is falling down,',"London ko'prigi qulayapti,",'G4:1.5 A4:.5 G4 F4 E4 F4 G4:2'],['My fair lady.',"Go'zal xonim.",'D4:2 G4:2 E4 C4:2'],['Build it up with iron bars,','Uni temir bilan qur,','G4:1.5 A4:.5 G4 F4 E4 F4 G4:2'],['Iron bars, iron bars.','Temir bilan, temir bilan.','D4 E4 F4:2 E4 F4 G4:2'],['Build it up with iron bars,','Uni temir bilan qur,','G4:1.5 A4:.5 G4 F4 E4 F4 G4:2'],['My fair lady.',"Go'zal xonim.",'D4:2 G4:2 E4 C4:2']] },
+  { id:'jingle', lv:'A2', t:'Jingle Bells', ic:'🔔', fun:1, focus:'Gerunds (dashing, laughing) · what fun it is', bpm:120,
+    words:[['dash','yelib bormoq'],['sleigh','chana'],['field','dala'],['laugh','kulmoq'],['ride','minmoq'],['fun','qiziq, maroqli']],
+    lines:[['Dashing through the snow,','Qor ichida yelib,','G4 E5 D5 C5 G4:3'],['In a one-horse open sleigh,','Bir otli ochiq chanada,','G4:.5 G4:.5 G4 E5 D5 C5 A4:3'],['O\'er the fields we go,','Dalalardan o\'tamiz,','A4 F5 E5 D5 B4:3'],['Laughing all the way!',"Yo'l bo'yi kulib!",'G5 G5 F5 D5 E5:3'],['Jingle bells, jingle bells,',"Qo'ng'iroqcha, qo'ng'iroqcha,",'E5 E5 E5:2 E5 E5 E5:2'],['Jingle all the way!',"Yo'l bo'yi jiringla!",'E5 G5 C5:1.5 D5:.5 E5:4'],['Oh, what fun it is to ride','Qanday maroqli minish',"F5 F5 F5:1.5 F5:.5 F5 E5 E5"],['In a one-horse open sleigh, hey!','Bir otli ochiq chanada, hey!','E5:.5 E5:.5 E5 D5 D5 E5 D5:2 G5:2'],['Jingle bells, jingle bells,',"Qo'ng'iroqcha, qo'ng'iroqcha,",'E5 E5 E5:2 E5 E5 E5:2'],['Jingle all the way!',"Yo'l bo'yi jiringla!",'E5 G5 C5:1.5 D5:.5 E5:4'],['Oh, what fun it is to ride','Qanday maroqli minish',"F5 F5 F5:1.5 F5:.5 F5 E5 E5"],['In a one-horse open sleigh!','Bir otli ochiq chanada!','E5:.5 E5:.5 G5 G5 F5 D5 C5:4']] },
+  { id:'susanna', lv:'A2', t:'Oh! Susanna', ic:'🪕', fun:1, focus:'Past simple · funny opposites', bpm:128,
+    words:[['banjo','banjo (cholg\'u)'],['knee','tizza'],['true love',"chin muhabbat"],['rain',"yomg'ir yog'moq"],['weather','ob-havo'],['freeze','muzlamoq'],['cry',"yig'lamoq"]],
+    lines:[['I come from Alabama with my banjo on my knee,',"Alabamadan keldim, tizzamda banjom bilan,"],['I\'m going to Louisiana, my true love for to see.',"Luiziana tomon ketyapman, sevgilimni ko'rgani."],['It rained all night the day I left, the weather it was dry,',"Ketgan kunim tun bo'yi yomg'ir yog'di, havo esa quruq edi,"],['The sun so hot, I froze to death, Susanna, don\'t you cry!',"Quyosh shunday issiq ediki, muzlab qoldim, Suzanna, yig'lama!"],['Oh, Susanna, oh, don\'t you cry for me,',"Oh, Suzanna, men uchun yig'lama,"],['For I come from Alabama with my banjo on my knee!','Axir men Alabamadan keldim, tizzamda banjom bilan!']] },
+  { id:'mountain', lv:'A2', t:'She\'ll Be Coming Round the Mountain', ic:'⛰️', fun:1, focus:'Future: will be + -ing · we\'ll all go out', bpm:126,
+    words:[['mountain',"tog'"],['ride','minmoq'],['horse','ot'],['meet','kutib olmoq'],['come round','aylanib kelmoq']],
+    lines:[['She\'ll be coming round the mountain when she comes! (Yee-ha!)',"U kelganda tog' ortidan aylanib keladi! (Yi-ha!)"],['She\'ll be coming round the mountain when she comes! (Yee-ha!)',"U kelganda tog' ortidan aylanib keladi!"],['She\'ll be coming round the mountain, she\'ll be coming round the mountain,',"Tog' ortidan aylanib keladi, tog' ortidan aylanib keladi,"],['She\'ll be coming round the mountain when she comes! (Yee-ha!)',"U kelganda tog' ortidan aylanib keladi!"],['She\'ll be riding six white horses when she comes! (Whoa back!)',"U kelganda oltita oq ot minib keladi! (To'xta!)"],['Oh, we\'ll all go out to meet her when she comes! (Hi, babe!)',"U kelganda hammamiz uni kutib olgani chiqamiz! (Salom!)"]] },
+  { id:'tenbed', lv:'A2', t:'Ten in the Bed', ic:'🛏️', fun:1, focus:'Numbers · past simple (said, rolled, fell)', bpm:112,
+    words:[['bed','karavot'],['roll over',"ag'darilmoq"],['fall out','tushib ketmoq'],['little one','kichkintoy']],
+    lines:[['There were ten in the bed, and the little one said,','Karavotda o\'nta edi, kichkintoy dedi:'],['"Roll over! Roll over!"',"\"Ag'darilinglar! Ag'darilinglar!\""],['So they all rolled over, and one fell out.',"Hammasi ag'darildi va bittasi tushib ketdi."],['There were nine in the bed, and the little one said,',"Karavotda to'qqizta edi, kichkintoy dedi:"],['"Roll over! Roll over!"',"\"Ag'darilinglar! Ag'darilinglar!\""],['So they all rolled over, and one fell out.',"Hammasi ag'darildi va bittasi tushib ketdi."],['There was one in the bed, and the little one said,','Karavotda bittasi qoldi, kichkintoy dedi:'],['"Good night!"','"Xayrli tun!"']] },
+
+  { id:'clementine', lv:'B1', t:'Oh My Darling, Clementine', ic:'⛏️', fun:1, focus:'Past simple · relative clauses (dwelt a miner …)', bpm:132,
+    words:[['cavern',"g'or"],['canyon','dara'],['miner','konchi'],['daughter','qiz (farzand)'],['forever','abadiy'],['dreadful','dahshatli']],
+    lines:[['In a cavern, in a canyon,',"G'orda, darada,",'C4 C4 C4 G3 E4 E4 E4 C4'],['Excavating for a mine,','Kon qazib yotgan joyda,','C4 E4 G4 G4 F4 E4 D4:3'],['Dwelt a miner, forty-niner,','Bir konchi yashardi, oltin izlovchi,','D4 E4 F4 F4 E4 D4 E4 C4'],['And his daughter, Clementine.','Va uning qizi Klementin.','C4 E4 D4 G3 B3 D4 C4:3'],['Oh my darling, oh my darling,','Oh, jonginam, oh, jonginam,','C4 C4 C4 G3 E4 E4 E4 C4'],['Oh my darling, Clementine,','Oh, jonginam Klementin,','C4 E4 G4 G4 F4 E4 D4:3'],['You are lost and gone forever,',"Sen yo'qolding, abadiy ketding,",'D4 E4 F4 F4 E4 D4 E4 C4'],['Dreadful sorry, Clementine.',"Juda-juda afsus, Klementin.",'C4 E4 D4 G3 B3 D4 C4:3']] },
+  { id:'bonnie', lv:'B1', t:'My Bonnie Lies over the Ocean', ic:'🌊', focus:'Present simple · bring back · over the …', bpm:120,
+    words:[['ocean','okean'],['bonnie',"go'zal (Shotlandcha)"],['lie','yotmoq, joylashmoq'],['bring back','qaytarib olib kelmoq']],
+    lines:[['My Bonnie lies over the ocean,',"Go'zalim okean ortida,",'G3 E4 D4 C4 D4 C4 A3 G3 E3:3'],['My Bonnie lies over the sea,',"Go'zalim dengiz ortida,",'G3 E4 D4 C4 C4 B3 C4 D4:3'],['My Bonnie lies over the ocean,',"Go'zalim okean ortida,",'G3 E4 D4 C4 D4 C4 A3 G3 E3:3'],['Oh, bring back my Bonnie to me.',"Oh, go'zalimni menga qaytaring.",'G3 A3 D4 C4 B3 A3 B3 C4:3'],['Bring back, bring back,','Qaytaring, qaytaring,','C4:2 A3 D4:3 C4:2'],['Oh, bring back my Bonnie to me, to me!',"Oh, go'zalimni menga qaytaring!",'G3 A3 D4 C4 B3 A3 B3 C4:3']] },
+  { id:'sailor', lv:'B1', t:'What Shall We Do with the Drunken Sailor?', ic:'⚓', fun:1, focus:'shall we …? (taklif) · early in the morning', bpm:140,
+    words:[['shall we','…aylikmi?'],['sailor','dengizchi'],['early','erta'],['rise',"ko'tarilmoq"],['put him in','uni …ga solmoq'],['shave','soqol olmoq']],
+    lines:[['What shall we do with the drunken sailor?','Mast dengizchini nima qilaylik?','A4 A4:.5 A4:.5 A4 A4:.5 A4:.5 A4 D4 F4 A4'],['What shall we do with the drunken sailor?','Mast dengizchini nima qilaylik?','G4 G4:.5 G4:.5 G4 G4:.5 G4:.5 G4 C4 E4 G4'],['What shall we do with the drunken sailor?','Mast dengizchini nima qilaylik?','A4 A4:.5 A4:.5 A4 A4:.5 A4:.5 A4 D4 F4 A4'],['Early in the morning!','Erta tongda!','C5 A4 G4 E4 D4:2'],['Way, hey, and up she rises,',"Hey-hey, kema ko'tarilar,",'A4:2 A4:2 A4 D4 F4 A4'],['Way, hey, and up she rises,',"Hey-hey, kema ko'tarilar,",'G4:2 G4:2 G4 C4 E4 G4'],['Way, hey, and up she rises,',"Hey-hey, kema ko'tarilar,",'A4:2 A4:2 A4 D4 F4 A4'],['Early in the morning!','Erta tongda!','C5 A4 G4 E4 D4:2'],['Put him in a long boat till he\'s sober,',"Hushyor bo'lguncha uzun qayiqqa solaylik,"],['Shave his belly with a rusty razor!',"Qornini zanglagan ustara bilan qiraylik!"]] },
+  { id:'wellerman', lv:'B1', t:'The Wellerman', ic:'🐋', fun:1, focus:'Past simple · soon may … · when … is done', bpm:104,
+    words:[['put to sea','dengizga chiqmoq'],['blow','esmoq'],['bow',"kema tumshug'i"],['whale','kit'],['take our leave',"xayrlashmoq"],['go','ketmoq']],
+    lines:[['There once was a ship that put to sea,','Bir zamonlar dengizga chiqqan kema bor edi,'],['The name of the ship was the Billy of Tea,','Kemaning nomi "Billi of Ti" edi,'],['The winds blew up, her bow dipped down,',"Shamollar turdi, kema tumshug'i pastga egildi,"],['Oh blow, my bully boys, blow! (Huh!)',"Puflang, mard yigitlar, puflang! (Ux!)"],['Soon may the Wellerman come,','Tezroq Veller kemasi kelsin,'],['To bring us sugar and tea and rum.','Bizga shakar, choy va boshqa narsalar olib kelsin.'],['One day, when the tonguin\' is done,',"Bir kun, ish tugagach,"],['We\'ll take our leave and go!',"Xayrlashib ketamiz!"]] },
+  { id:'ballgame', lv:'B1', t:'Take Me Out to the Ball Game', ic:'⚾', fun:1, focus:'Imperatives · I don\'t care if … · it\'s a shame', bpm:132,
+    words:[['crowd','olomon'],['peanuts',"yeryong'oq"],['care','parvo qilmoq'],['root for',"…ni qo'llab-quvvatlamoq"],['shame','afsus, uyat'],['strike','urinish (beysbolda)']],
+    lines:[['Take me out to the ball game,',"Meni beysbol o'yiniga olib bor,"],['Take me out with the crowd.','Meni olomon bilan olib bor.'],['Buy me some peanuts and Cracker Jack,',"Menga yeryong'oq va popkorn olib ber,"],['I don\'t care if I never get back.',"Hech qaytmasam ham parvoyim yo'q."],['Let me root, root, root for the home team,',"Mahalliy jamoani qo'llab-quvvatlay,"],['If they don\'t win, it\'s a shame.',"Agar yutmasa, afsus."],['For it\'s one, two, three strikes, you\'re out,',"Bir, ikki, uch urinish — chiqding,"],['At the old ball game!',"Eski yaxshi beysbolda!"]] },
+  { id:'daisy', lv:'B1', t:'Daisy Bell (A Bicycle Built for Two)', ic:'🚲', fun:1, focus:'won\'t / can\'t afford · you\'ll look …', bpm:120,
+    words:[['answer','javob'],['half crazy',"yarim telba"],['stylish','zamonaviy, chiroyli'],['marriage',"nikoh, to'y"],['afford',"qurbi yetmoq"],['carriage','arava, kareta'],['bicycle','velosiped']],
+    lines:[['Daisy, Daisy, give me your answer, do.','Deyzi, Deyzi, javobingni ber.'],['I\'m half crazy, all for the love of you.',"Senga muhabbatdan yarim telba bo'ldim."],['It won\'t be a stylish marriage,',"To'yimiz dabdabali bo'lmaydi,"],['I can\'t afford a carriage,','Karetaga qurbim yetmaydi,'],['But you\'ll look sweet upon the seat',"Lekin o'rindiqda juda yoqimli ko'rinasan"],['Of a bicycle built for two!',"Ikki kishilik velosipedning!"]] },
+
+  { id:'scarborough', lv:'B2', t:'Scarborough Fair', ic:'🌿', focus:'Imperatives · Tell her to … · then she\'ll be …', bpm:84,
+    words:[['fair','yarmarka'],['parsley',"petrushka"],['sage','shalfey'],['rosemary','rozmarin'],['thyme','kakliko\'ti'],['seam','chok'],['needlework','kashta, tikuv']],
+    lines:[['Are you going to Scarborough Fair?','Skarboro yarmarkasiga borasanmi?'],['Parsley, sage, rosemary and thyme.',"Petrushka, shalfey, rozmarin va kakliko'ti."],['Remember me to one who lives there,',"U yerda yashovchi bir kishiga mendan salom ayt,"],['She once was a true love of mine.',"U bir paytlar chin sevgilim edi."],['Tell her to make me a cambric shirt,',"Ayt, menga nozik ko'ylak tiksin,"],['Without no seams nor needlework,',"Chok ham, tikuv ham bo'lmasin,"],['Then she\'ll be a true love of mine.',"Shunda u chin sevgilim bo'ladi."]] },
+  { id:'shenandoah', lv:'B2', t:'Shenandoah', ic:'🏞️', focus:'I long to … · away (poetic) · I\'m bound …', bpm:72,
+    words:[['long to',"…ni qattiq xohlamoq"],['rolling','oqib turgan'],['bound','yo\'lga chiqqan, …ga ketayotgan'],['wide','keng'],['across','orqali, ortiga']],
+    lines:[['Oh Shenandoah, I long to see you,',"Oh Shenandoa, seni ko'rgim keladi,"],['Away, you rolling river.','Oqib ketayotgan daryo.'],['Oh Shenandoah, I long to see you,',"Oh Shenandoa, seni ko'rgim keladi,"],['Away, I\'m bound away,',"Uzoqqa, men uzoqqa ketyapman,"],['Across the wide Missouri.','Keng Missuri ortiga.']] },
+  { id:'danny', lv:'B2', t:'Danny Boy', ic:'🎻', focus:'Present continuous for now · \'tis = it is · I must …', bpm:72,
+    words:[['pipes','nay, volinka'],['glen','vodiy'],['mountainside',"tog' yonbag'ri"],['fall',"to'kilmoq"],['bide','kutib qolmoq (eskirgan)']],
+    lines:[['Oh Danny boy, the pipes, the pipes are calling,','Oh Denni, naylar, naylar chorlayapti,'],['From glen to glen, and down the mountainside.',"Vodiydan vodiyga, tog' yonbag'ridan pastga."],['The summer\'s gone, and all the roses falling,',"Yoz o'tdi, atirgullar to'kilyapti,"],['\'Tis you, \'tis you must go, and I must bide.','Sen ketishing kerak, men esa kutib qolaman.']] },
+  { id:'auld', lv:'B2', t:'Auld Lang Syne (New Year Song)', ic:'🎆', fun:1, focus:'Passive (be forgot) · Scots words: auld = old, syne = since', bpm:88,
+    words:[['acquaintance','tanish'],['forget','unutmoq'],['bring to mind','eslamoq'],['auld lang syne',"eski qadrdon kunlar"],['kindness','mehr']],
+    lines:[['Should auld acquaintance be forgot,','Eski tanishlar unutilsinmi,'],['And never brought to mind?','Va hech qachon esga olinmasinmi?'],['Should auld acquaintance be forgot,','Eski tanishlar unutilsinmi,'],['And auld lang syne?',"Va o'sha eski qadrdon kunlar?"],['For auld lang syne, my dear,',"Eski qadrdon kunlar uchun, azizim,"],['For auld lang syne,',"Eski qadrdon kunlar uchun,"],['We\'ll take a cup of kindness yet,','Bir kosa mehr ichamiz hali,'],['For auld lang syne.',"Eski qadrdon kunlar uchun."]] }
+  ];
+
+  /* Popular songs: titles and what to learn from them; the learner listens with lyrics on YouTube. [title, artist, level, vibe(1 = energetic), what you learn] */
+  const POP = [
+    ['Yellow Submarine','The Beatles','A1',1,"Oddiy gaplar, past simple (lived, sailed). Birga kuylash oson."],
+    ['Hello, Goodbye','The Beatles','A1',1,"Qarama-qarshi so'zlar: yes/no, high/low, hello/goodbye."],
+    ['We Will Rock You','Queen','A1',1,"Qisqa, kuchli gaplar. Qarsak va oyoq ritmi bilan."],
+    ['Happy','Pharrell Williams','A2',1,"His-tuyg'ular, 'Because I'm happy' qolipi. Juda sho'x."],
+    ['Count on Me','Bruno Mars','A2',0,"Do'stlik; If … I will … (birinchi shart gap). O'rganuvchilar uchun eng yaxshilaridan."],
+    ['The Lazy Song','Bruno Mars','A2',1,"Today I don't feel like … : bugungi rejalar, future (I'm gonna). Kulgili."],
+    ['Don\'t Worry, Be Happy','Bobby McFerrin','A2',1,"Buyruq gaplar: Don't worry, be happy. Sekin va aniq talaffuz."],
+    ['Lemon Tree','Fool\'s Garden','A2',1,"Present continuous: I'm sitting here, I'm waiting. Zerikkan kun haqida."],
+    ['Ob-La-Di, Ob-La-Da','The Beatles','A2',1,"Kichik hikoya: past simple (bought, said, took). Juda quvnoq."],
+    ['Yesterday','The Beatles','A2',0,"Past simple va 'I believe in yesterday'. Sekin, aniq."],
+    ['Can\'t Stop the Feeling!','Justin Timberlake','A2',1,"Raqs, his-tuyg'u so'zlari. Energiya beradi."],
+    ['Waka Waka','Shakira','A2',1,"Ruhlantiruvchi gaplar: You're a good soldier… Sport ruhi."],
+    ['Just the Way You Are','Bruno Mars','A2',0,"Sifatlar va maqtov: amazing, beautiful, perfect."],
+    ['Bad Day','Daniel Powter','A2',0,"Yomon kun haqida: You had a bad day… past simple."],
+    ['Heal the World','Michael Jackson','A2',0,"Make it a better place: make + object + sifat."],
+    ['Shake It Off','Taylor Swift','B1',1,"They say …: odamlar nima deydi; present simple, sho'x."],
+    ['Uptown Funk','Mark Ronson ft. Bruno Mars','B1',1,"Jonli so'zlashuv iboralari va slang. Raqs uchun."],
+    ['Counting Stars','OneRepublic','B1',1,"Lately I've been …: present perfect continuous."],
+    ['Believer','Imagine Dragons','B1',1,"Kuchli fe'llar, o'tmish va hozir taqqoslash."],
+    ['Thunder','Imagine Dragons','B1',1,"Orzular, 'I was dreaming of bigger things'."],
+    ['Viva la Vida','Coldplay','B1',1,"Used to: I used to rule the world (oldin … edim)."],
+    ['Shape of You','Ed Sheeran','B1',1,"Kundalik vaziyatlar, present simple hikoya."],
+    ['Perfect','Ed Sheeran','B1',0,"Romantik; past simple va future. Sekin, tushunarli."],
+    ['Photograph','Ed Sheeran','B1',0,"Xotiralar; We keep this love in a photograph."],
+    ['Firework','Katy Perry','B1',1,"Do you ever feel …? savollari. Ruhlantiradi."],
+    ['Roar','Katy Perry','B1',1,"O'zgarish haqida: I used to … , now I …"],
+    ['Hall of Fame','The Script','B1',1,"You can be …: imkoniyat va ruhlantirish."],
+    ['Wake Me Up','Avicii','B1',1,"Kelajak va o'zlikni izlash; when + present."],
+    ['I\'m Yours','Jason Mraz','B1',1,"Yengil, quvnoq; tez gapirishga mashq."],
+    ['Hey, Soul Sister','Train','B1',1,"Sho'x ritm, zamonaviy iboralar."],
+    ['Let It Be','The Beatles','B1',0,"When I find myself …: when bilan gaplar."],
+    ['Hey Jude','The Beatles','B1',0,"Don't be afraid, take a sad song…: maslahat beruvchi buyruqlar."],
+    ['Imagine','John Lennon','B1',0,"Imagine there's no …: tasavvur gaplari."],
+    ['We Are the Champions','Queen','B1',1,"Present perfect: I've paid my dues, I've made a few mistakes."],
+    ['Let Her Go','Passenger','B1',0,"Only … when …: paradokslar, aniq talaffuz."],
+    ['Memories','Maroon 5','B1',0,"Toast to …: tilak bildirish; xotiralar."],
+    ['Sugar','Maroon 5','B1',1,"Jonli so'zlashuv, I need your …"],
+    ['Dance Monkey','Tones and I','B1',1,"Tez ritm, takrorlanuvchi iboralar."],
+    ['Levitating','Dua Lipa','B1',1,"Taklif: I got you, you're my …; raqs uchun."],
+    ['Blinding Lights','The Weeknd','B1',1,"I've been tryna call…: so'zlashuv qisqartmalari."],
+    ['Someone Like You','Adele','B2',0,"Present perfect va past: I heard that you're settled down."],
+    ['Rolling in the Deep','Adele','B2',1,"Kuchli his-tuyg'u, We could have had it all (could have)."],
+    ['Hello','Adele','B2',0,"Telefon suhbati: It's me, I was wondering if …"],
+    ['Thinking Out Loud','Ed Sheeran','B2',0,"Kelajak: When your legs don't work like they used to…"],
+    ['Riptide','Vance Joy','B2',1,"Tez talaffuz, idiomalar: I was scared of dentists…"],
+    ['Stressed Out','Twenty One Pilots','B2',1,"I wish I could …: orzu gaplari; tez rap."],
+    ['Bohemian Rhapsody','Queen','B2',1,"Hikoya, opera; murakkab so'zlar. Eng sho'x klassika."]
+  ];
+
+  const TUNE_NOTE = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+  /* "C#4:1.5" -> { f: frequency, d: beats } */
+  function parseNotes(s){
+    return String(s || '').trim().split(/\s+/).filter(Boolean).map(tok => {
+      const [n, d] = tok.split(':'); const m = /^([A-G])([#b]?)(\d)$/.exec(n);
+      if (!m) return { f: 0, d: +d || 1 };
+      const midi = 12 * (+m[3] + 1) + TUNE_NOTE[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+      return { f: 440 * Math.pow(2, (midi - 69) / 12), d: d ? +d : 1 };
+    });
+  }
+  return { TALES, SONGS, POP, parseNotes };
+})();
+
 (() => {
 const $ = id => document.getElementById(id);
 const q = $('q'), feed = $('feed');
@@ -2707,6 +3236,8 @@ function errText(e){
     : e.code === 'rate_limited' ? "Biroz shoshildik. Bir necha soniyadan keyin qayta urinib ko'ring."
     : e.code === 'quota' ? "Bugungi bepul suhbat tugadi. Ertaga yana gaplashamiz!"
     : e.code === 'auth' ? "Mini Appni yopib, qayta oching."
+    : e.code === 'busy' ? "Server hozir band. Bir daqiqadan keyin qayta urinib ko'ring."
+    : e.code === 'upstream' ? "AI hozir javob bermadi. Bir ozdan keyin qayta urinib ko'ring."
     : "Internet bilan muammo bo'ldi. Qayta urinib ko'ring.";
 }
 
@@ -3235,9 +3766,9 @@ function coreDaily(force){
 }
 const packItems = p => p.list || p.items.split(';').map(s => { const [w, uz, ex] = s.split('|'); return { w, uz, ex }; });
 const hasWord = w => words.some(x => x.w.toLowerCase() === String(w).toLowerCase().trim());
-function addWords(list, src){
+function addWords(list, src, max){
   const added = [];
-  (Array.isArray(list) ? list : []).slice(0,3).forEach(w => {
+  (Array.isArray(list) ? list : []).slice(0, max || 3).forEach(w => {
     if (!w || !w.w) return; const key = String(w.w).toLowerCase().trim();
     if (key.length < 2 || key.length > 60 || hasWord(key)) return;
     const item = { w:String(w.w).trim(), uz:String(w.uz||'').trim(), ex:String(w.ex||'').trim(), box:0, due:today(), src:src||'' };
@@ -3711,10 +4242,11 @@ CH.paint($('avatarSvg'), settings.char, true);
 
 /* ================= rooms, settings ================= */
 function setRoom(r){
-  room = r; stopListen(); stopDrill();
+  room = r; stopListen(); stopDrill(); stopFunAudio();
   document.querySelectorAll('.nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.room === r));
-  $('room-talk').hidden = r !== 'talk'; $('room-words').hidden = r !== 'words'; $('room-drill').hidden = r !== 'drill';
+  $('room-talk').hidden = r !== 'talk'; $('room-words').hidden = r !== 'words'; $('room-drill').hidden = r !== 'drill'; $('room-fun').hidden = r !== 'fun';
   if (r === 'drill'){ stopSpeaking(); renderDrill(); return; }
+  if (r === 'fun'){ stopSpeaking(); renderFun(); return; }
   if (r === 'words'){ stopSpeaking(); queue = []; renderWordsRoom(); }
   else { status('', micBlocked ? 'Javob yozing' : 'Tugmani bosing va gapiring'); renderTargets(); }
 }
@@ -3798,7 +4330,7 @@ async function initTelegram(){
     $('level').value = settings.level; $('goal').value = String(settings.goal); $('rate').value = String(settings.rate);
     renderGoal(); renderBadge(); renderTopics(); startTalk(false); setTimeout(testNudge, 1200);
     const start = new URLSearchParams(location.search).get('room') || (TG.initDataUnsafe && TG.initDataUnsafe.start_param);
-    if (start === 'words' || start === 'drill'){ setRoom(start); sync(); }
+    if (start === 'words' || start === 'drill' || start === 'fun'){ setRoom(start); sync(); }
     if (start === 'audio'){ setRoom('drill'); renderEpisodes($('drill')); sync(); }
   } catch(e){ status('', errText(e)); }
   window.addEventListener('pagehide', () => { if (syncT){ clearTimeout(syncT); pushState(); } });
@@ -4092,12 +4624,16 @@ function lineHtml(text, ep){
   return span;
 }
 let epRate = LS.get('epRate', 0.9);
-function runEpisode(box, ep){
+function runEpisode(box, ep, back){
   box.innerHTML = '';
-  const c = el('div', 'dcard ep');
-  const gOf = s => ep.kind === 'story' ? (wantMale() ? 'male' : 'female') : (s === ep.male ? 'male' : 'female');
-  c.append(el('div', 'dstep', (ep.kind === 'story' ? '📖 Hikoya' : '💬 Dialog') + ` · ${ep.lines.length} gap · ~${Math.max(1, Math.round(ep.lines.reduce((a, l) => a + l.en.split(' ').length, 0) / 120))} daqiqa`), el('div', 'dtitle', ep.title));
-  if (ep.words.length) { const kw = el('div', 'epwords'); kw.append(el('span', 'tl', "O'rgangan so'zlaringiz:")); ep.words.forEach(x => kw.append(el('span', 'tw', x.w))); c.append(kw); }
+  const c = el('div', 'dcard ep'), tale = ep.kind === 'tale';
+  const narr = wantMale() ? 'male' : 'female';
+  const gOf = s => (ep.g && ep.g[s]) || (s === 'N' || ep.kind === 'story' ? narr : s === ep.male ? 'male' : 'female');
+  c.append(el('div', 'dstep', (tale ? '📖 Ertak' + (ep.lv ? ' · ' + ep.lv : '') : ep.kind === 'story' ? '📖 Hikoya' : '💬 Dialog') + ` · ${ep.lines.length} gap · ~${Math.max(1, Math.round(ep.lines.reduce((a, l) => a + l.en.split(' ').length, 0) / 120))} daqiqa`), el('div', 'dtitle', (ep.ic ? ep.ic + ' ' : '') + ep.title));
+  if (ep.focus) c.append(el('div', 'focus', '📚 Dars: ' + ep.focus));
+  if (ep.words.length) { const kw = el('div', 'epwords'); kw.append(el('span', 'tl', tale ? "Yangi so'zlar:" : "O'rgangan so'zlaringiz:")); ep.words.forEach(x => { const t = btn('tw', x.w, () => { dnote(c, x.w + ' — ' + (x.uz || '')); speakParts([{ text: x.w, rate: 0.85 }]); }); kw.append(t); });
+    if (tale) kw.append(btn('tool', "➕ Lug'atga", () => { const a = addWords(ep.words, 'tale', 10); dnote(c, a.length ? `${a.length} ta so'z lug'atingizga qo'shildi.` : "Bu so'zlar lug'atingizda bor."); }));
+    c.append(kw); }
   const ctl = el('div', 'drow epctl');
   let playing = false, run = 0, from = 0, repeatMode = LS.get('epRepeat', false), showUz = false;
   const playBtn = btn('btn primary', '▶ Tinglash', () => playing ? stop() : play(from));
@@ -4107,8 +4643,8 @@ function runEpisode(box, ep){
   ctl.append(playBtn, speedBtn, repBtn, uzBtn, volBtn()); c.append(ctl);
   const list = el('div', 'eplines');
   const rows = ep.lines.map((l, i) => {
-    const r = el('div', 'epl ' + (ep.kind === 'story' ? 'n' : l.s === 'A' ? 'a' : 'b'));
-    if (ep.kind !== 'story') r.append(el('div', 'who', ep.names[l.s] || l.s));
+    const r = el('div', 'epl ' + (ep.kind === 'story' || l.s === 'N' ? 'n' : l.s === 'A' ? 'a' : 'b'));
+    if (ep.kind !== 'story' && l.s !== 'N') r.append(el('div', 'who', ep.names[l.s] || l.s));
     const t = el('div', 'en'); t.append(lineHtml(l.en, ep)); r.append(t, el('div', 'uz', l.uz));
     r.onclick = () => { stop(); from = i; play(i, true); };
     list.append(r); return r;
@@ -4128,7 +4664,7 @@ function runEpisode(box, ep){
       if (one && !repeatMode) { playing = false; playBtn.textContent = '▶ Davom ettirish'; from = k + 1; return; }
     }
     playing = false; from = 0; mark(-1); playBtn.textContent = '▶ Yana tinglash';
-    ep.plays = (ep.plays || 0) + 1; LS.set('episodes', episodes);
+    ep.plays = (ep.plays || 0) + 1; if (ep.save) ep.save(); else LS.set('episodes', episodes);
     showQs();
   }
   const qs = el('div', 'epqs'); c.append(qs);
@@ -4147,7 +4683,7 @@ function runEpisode(box, ep){
     }));
   }
   if (ep.plays) showQs();
-  const foot = el('div', 'drow'); foot.append(btn('btn', '← Orqaga', () => { stop(); renderEpisodes(box); })); c.append(foot);
+  const foot = el('div', 'drow'); foot.append(btn('btn', '← Orqaga', () => { stop(); back ? back() : renderEpisodes(box); })); c.append(foot);
   box.append(c);
 }
 async function newEpisode(box, kind){
@@ -4169,6 +4705,208 @@ function renderEpisodes(box){
   }
   box.append(btn('btn', '← Mashqlarga', renderDrill));
 }
+/* ================= Ertak · Qo'shiq: tales and songs by level ================= */
+let funDone = LS.get('funDone', {}), funMine = LS.get('funMine', []), funTab = LS.get('funTab', 'tales'), funLv = null;
+const funLevel = () => funLv || vlevel();
+const funMark = id => { funDone[id] = (funDone[id] || 0) + 1; LS.set('funDone', funDone); };
+function openExt(url){ try { if (TG && TG.openLink) return TG.openLink(url); } catch(e){} window.open(url, '_blank', 'noopener'); }
+const ytLink = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
+/* a tale from the library (or one the AI wrote) in the audio-lesson player format */
+function taleEp(t){
+  return { id: t.id, kind: 'tale', lv: t.lv, ic: t.ic, title: t.t, focus: t.focus, names: Object.assign({ N: 'Narrator' }, t.names || {}), g: t.g || {},
+    lines: t.lines.map(([s, en, uz]) => ({ s, en, uz })), words: (t.words || []).map(([w, uz]) => ({ w, uz })),
+    questions: (t.qs || []).map(([q, uz, a]) => ({ q, uz, a })), plays: funDone[t.id] || 0, save(){ funMark(t.id); } };
+}
+
+/* ---- a tiny synthesizer: melodies for sing-along and a drum beat for chants (volume follows the volume setting) ---- */
+let synthOut = null, tuneNodes = [], beatT = null, noiseBuf = null;
+function synthBus(){
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
+  if (!synthOut){ synthOut = actx.createGain(); synthOut.connect(actx.destination); }
+  synthOut.gain.value = vol() * 0.55; return synthOut;
+}
+function stopTune(){ tuneNodes.forEach(n => { try { n.stop(); } catch(e){} }); tuneNodes = []; }
+function stopBeat(){ clearInterval(beatT); beatT = null; }
+function stopFunAudio(){ stopTune(); stopBeat(); }
+/* plays one line of notes, resolves when it ends; returns its length in seconds too */
+function playTune(notes, bpm){
+  const out = synthBus(), ns = FUN.parseNotes(notes), spb = 60 / bpm; let t = actx.currentTime + 0.06;
+  ns.forEach(n => {
+    const d = n.d * spb;
+    if (n.f){
+      const o = actx.createOscillator(), o2 = actx.createOscillator(), g = actx.createGain(), g2 = actx.createGain();
+      o.type = 'triangle'; o.frequency.value = n.f; o2.type = 'sine'; o2.frequency.value = n.f * 2; g2.gain.value = 0.18;
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.55, t + 0.02); g.gain.exponentialRampToValueAtTime(0.28, t + Math.max(0.05, d * 0.5)); g.gain.linearRampToValueAtTime(0.0001, t + d * 0.95);
+      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(out); o.start(t); o2.start(t); o.stop(t + d); o2.stop(t + d); tuneNodes.push(o, o2);
+    }
+    t += d;
+  });
+  const len = t - actx.currentTime;
+  return { len, done: sleep(len * 1000) };
+}
+function noise(){ if (!noiseBuf){ noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.3, actx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } const s = actx.createBufferSource(); s.buffer = noiseBuf; return s; }
+function drum(kind, t, out){
+  if (kind === 'kick'){ const o = actx.createOscillator(), g = actx.createGain(); o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.14); g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.22); o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.25); return; }
+  const s = noise(), f = actx.createBiquadFilter(), g = actx.createGain(), hat = kind === 'hat';
+  f.type = hat ? 'highpass' : 'bandpass'; f.frequency.value = hat ? 7000 : 1800;
+  g.gain.setValueAtTime(hat ? 0.12 : 0.38, t); g.gain.exponentialRampToValueAtTime(0.001, t + (hat ? 0.04 : 0.13));
+  s.connect(f); f.connect(g); g.connect(out); s.start(t); s.stop(t + 0.15);
+}
+function startBeat(bpm){
+  stopBeat(); const out = synthBus(), step8 = 60 / bpm / 2; let next = actx.currentTime + 0.08, k = 0;
+  beatT = setInterval(() => {
+    while (next < actx.currentTime + 0.25){
+      drum('hat', next, out); if (k === 0 || k === 4 || k === 5) drum('kick', next, out); if (k === 2 || k === 6) drum('snare', next, out);
+      next += step8; k = (k + 1) % 8;
+    }
+  }, 60);
+}
+
+/* ---- the room ---- */
+function renderFun(){
+  if (room !== 'fun') return;
+  const box = $('fun'); box.innerHTML = ''; stopFunAudio(); stopSpeaking();
+  const lv = funLevel(), done = id => (funDone[id] || 0) > 0;
+  const nDone = FUN.TALES.concat(FUN.SONGS).filter(x => done(x.id)).length;
+  $('fSub').textContent = nDone ? `${nDone} ta ertak va qo'shiq tinglangan` : "Darajangizga mos ertak va qo'shiqlar";
+  const tabs = el('div', 'vtabs');
+  VLEVELS.forEach(l => { const all = FUN.TALES.concat(FUN.SONGS).filter(x => x.lv === l), d = all.filter(x => done(x.id)).length;
+    const b = btn('vtab' + (l === lv ? ' on' : ''), '', () => { funLv = l; renderFun(); }); const bar = el('i'); bar.style.setProperty('--p', (d / all.length * 100).toFixed(0) + '%');
+    b.append(el('b', null, l), el('small', null, `${d}/${all.length}`), bar); tabs.append(b); });
+  box.append(tabs);
+  if (lv !== vlevel()) box.append(el('p', 'note', `Sizning darajangiz: ${vlevel()}. Bu yerda ${lv} darajadagilar.`));
+  /* today's pick: the first tale and song at this level not heard yet */
+  const t1 = FUN.TALES.find(x => x.lv === lv && !done(x.id)), s1 = FUN.SONGS.find(x => x.lv === lv && !done(x.id));
+  if (t1 || s1){
+    const c = el('div', 'dcard funpick'); c.append(el('div', 'dstep', '⭐ Bugungi tavsiya'));
+    const row = el('div', 'drow');
+    if (t1) row.append(btn('btn primary', t1.ic + ' ' + t1.t, () => runEpisode(box, taleEp(t1), renderFun)));
+    if (s1) row.append(btn('btn', s1.ic + ' ' + s1.t, () => runSong(box, songOf(s1), renderFun)));
+    c.append(row); box.append(c);
+  }
+  const seg = el('div', 'fseg');
+  [['tales', "📖 Ertaklar"], ['songs', "🎵 Qo'shiqlar"], ['pop', '⭐ Mashhur'], ['mine', '✨ Meniki']].forEach(([id, t]) => seg.append(btn('segb' + (funTab === id ? ' on' : ''), t, () => { funTab = id; LS.set('funTab', id); renderFun(); })));
+  box.append(seg);
+  const item = (ic, t, sub, fn, isDone, fun) => { const b = btn('dpick' + (isDone ? ' done' : ''), '', fn); b.append(el('span', 'dic', ic), el('b', null, t + (fun ? ' 😄' : '') + (isDone ? ' ✓' : '')), el('small', null, sub)); box.append(b); };
+  if (funTab === 'tales'){
+    box.append(el('p', 'note', "Avval matnsiz tinglang, keyin 🇺🇿 Tarjima bilan tekshiring. 🔁 Takrorlab rejimida har gapni qaytaring. Oxirida 3 ta savolga ovoz bilan javob bering."));
+    FUN.TALES.filter(x => x.lv === lv).forEach(t => item(t.ic, t.t, `${t.focus} · ${t.lines.length} gap` + (funDone[t.id] ? ` · ${funDone[t.id]} marta` : ''), () => runEpisode(box, taleEp(t), renderFun), done(t.id), t.fun));
+    box.append(btn('btn primary', "✨ So'zlarimdan yangi ertak", () => newFun(box, 'tale')));
+  } else if (funTab === 'songs'){
+    box.append(el('p', 'note', "🎵 Kuy: ohang chalinadi, siz qo'shilib kuylaysiz. 🥁 Ritm: baraban ostida o'qiladi. 🎤 Navbat: bir qator men, bir qator siz."));
+    FUN.SONGS.filter(x => x.lv === lv).forEach(s => item(s.ic, s.t, s.focus + (s.lines.some(l => l[2]) ? ' · 🎵 kuy bor' : ' · 🥁 ritm'), () => runSong(box, songOf(s), renderFun), done(s.id), s.fun));
+    box.append(btn('btn primary', "✨ So'zlarimdan yangi qo'shiq", () => newFun(box, 'song')));
+  } else if (funTab === 'pop'){
+    box.append(el('p', 'note', "Haqiqiy qo'shiqlar YouTube'da so'zlari bilan ochiladi. Usul: 1) shunchaki tinglang, 2) so'zlarini o'qib tinglang, 3) qo'shilib kuylang, 4) bitta qatorini yod oling."));
+    const list = FUN.POP.filter(x => x[2] === lv); (list.length ? list : FUN.POP).forEach(p => { const id = 'pop:' + p[0]; item(p[3] ? '🔥' : '🎧', p[0], p[1] + ' · ' + p[4], () => runPop(box, p, renderFun), done(id)); });
+  } else {
+    box.append(el('p', 'note', "Bu yerda AI siz o'rgangan so'zlardan yozgan ertak va qo'shiqlar saqlanadi (oxirgi 20 ta)."));
+    const row = el('div', 'drow'); row.append(btn('btn primary', '✨ Yangi ertak', () => newFun(box, 'tale')), btn('btn primary', "✨ Yangi qo'shiq", () => newFun(box, 'song'))); box.append(row);
+    funMine.forEach(m => item(m.type === 'song' ? '🎤' : '📖', m.t, `${m.lv} · ${m.day || ''} · ${m.focus || ''}`, () => m.type === 'song' ? runSong(box, songOf(m), renderFun) : runEpisode(box, taleEp(m), renderFun), done(m.id)));
+  }
+}
+const songOf = s => ({ id: s.id, t: s.t, ic: s.ic, lv: s.lv, focus: s.focus, bpm: s.bpm || 104, ai: s.ai, words: (s.words || []).map(([w, uz]) => ({ w, uz })), lines: s.lines.map(([en, uz, notes]) => ({ en, uz, notes })) });
+
+let funRate = LS.get('funRate', 1);
+function runSong(box, s, back){
+  box.innerHTML = ''; stopFunAudio(); stopSpeaking();
+  const hasTune = s.lines.some(l => l.notes), c = el('div', 'dcard ep song');
+  c.append(el('div', 'dstep', `🎵 Qo'shiq · ${s.lv}` + (s.ai ? ' · ✨ AI yozgan' : '')), el('div', 'dtitle', s.ic + ' ' + s.t));
+  if (s.focus) c.append(el('div', 'focus', '📚 Dars: ' + s.focus));
+  if (s.words.length){ const kw = el('div', 'epwords'); kw.append(el('span', 'tl', "So'zlar:")); s.words.forEach(x => kw.append(btn('tw', x.w, () => { dnote(c, x.w + ' — ' + (x.uz || '')); speakParts([{ text: x.w, rate: 0.85 }]); })));
+    kw.append(btn('tool', "➕ Lug'atga", () => { const a = addWords(s.words, 'song', 10); dnote(c, a.length ? `${a.length} ta so'z lug'atingizga qo'shildi.` : "Bu so'zlar lug'atingizda bor."); })); c.append(kw); }
+  let mode = hasTune ? 'tune' : 'beat', run = 0, playing = false, showUz = false;
+  const modes = el('div', 'fseg');
+  const MODES = [['tune', '🎵 Kuy'], ['beat', '🥁 Ritm'], ['turn', '🎤 Navbat'], ['slow', "🐢 Sekin o'qish"]].filter(m => m[0] !== 'tune' || hasTune);
+  const paintModes = () => modes.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+  MODES.forEach(([m, t]) => { const b = btn('segb', t, () => { mode = m; paintModes(); stop(); play(0); }); b.dataset.m = m; modes.append(b); });
+  c.append(modes); paintModes();
+  const ctl = el('div', 'drow epctl');
+  const playBtn = btn('btn primary', '▶ Boshlash', () => playing ? stop() : play(0));
+  const rateBtn = btn('btn', '⏱ ' + funRate + 'x', () => { funRate = funRate >= 1.2 ? 0.8 : funRate >= 1 ? 1.2 : 1; LS.set('funRate', funRate); rateBtn.textContent = '⏱ ' + funRate + 'x'; });
+  const uzBtn = btn('btn', '🇺🇿 Tarjima', () => { showUz = !showUz; list.classList.toggle('showuz', showUz); });
+  ctl.append(playBtn, rateBtn, uzBtn, volBtn()); c.append(ctl);
+  const list = el('div', 'eplines');
+  const rows = s.lines.map((l, i) => { const r = el('div', 'epl n sl'); r.append(el('div', 'en', l.en), el('div', 'uz', l.uz), el('i', 'sbar')); r.onclick = () => { stop(); play(i, true); }; list.append(r); return r; });
+  c.append(list);
+  const your = el('div', 'yourturn', '🎤 Endi siz kuylang!'); your.hidden = true; c.append(your);
+  const mark = (i, len) => rows.forEach((r, k) => { r.classList.toggle('cur', k === i); const b = r.querySelector('.sbar'); b.style.transition = 'none'; b.style.width = '0';
+    if (k === i){ r.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); if (len){ void b.offsetWidth; b.style.transition = `width ${len}s linear`; b.style.width = '100%'; } } });
+  function stop(){ run++; playing = false; stopFunAudio(); stopSpeaking(); your.hidden = true; playBtn.textContent = '▶ Boshlash'; }
+  async function sayLine(l, rate){ await speakParts([{ text: l.en.replace(/\(.*?\)/g, ''), rate }]); }
+  async function play(i, one){
+    const my = ++run; playing = true; playBtn.textContent = '⏸ To\'xtatish';
+    const bpm = s.bpm * funRate;
+    try { synthBus(); } catch(e){}
+    if (mode === 'beat') startBeat(bpm);
+    for (let k = i; k < s.lines.length; k++){
+      if (run !== my) return; const l = s.lines[k];
+      if ((mode === 'tune' || mode === 'turn') && l.notes){
+        const t = playTune(l.notes, bpm); mark(k, t.len); await t.done;
+        if (mode === 'turn'){ if (run !== my) return; your.hidden = false; mark(k, t.len); await sleep(t.len * 1000 + 400); your.hidden = true; }
+      } else {
+        mark(k); await sayLine(l, mode === 'slow' ? 0.7 : 0.92 * funRate);
+        if (run !== my) return;
+        if (mode === 'turn'){ your.hidden = false; await sleep(Math.min(7000, 1000 + l.en.split(' ').length * 480)); your.hidden = true; }
+        else await sleep(mode === 'slow' ? 700 : mode === 'beat' ? 120 : 250);
+      }
+      if (one) break;
+    }
+    if (run !== my) return;
+    stop(); mark(-1);
+    if (!one){ funMark(s.id); dnote(c, "👏 Barakalla! Endi 🎤 Navbat rejimida o'zingiz kuylab ko'ring yoki YouTube'da asl ijroni tinglang."); }
+  }
+  const foot = el('div', 'drow');
+  if (!s.ai) foot.append(btn('btn', "▶ YouTube'da tinglash", () => openExt(ytLink(s.t + ' song with lyrics'))));
+  foot.append(btn('btn', '← Orqaga', () => { stop(); back(); }));
+  c.append(foot); box.append(c);
+}
+function runPop(box, p, back){
+  box.innerHTML = ''; stopFunAudio(); stopSpeaking();
+  const [title, artist, lv, hot, learn] = p, id = 'pop:' + title, c = el('div', 'dcard');
+  c.append(el('div', 'dstep', `${hot ? "🔥 Sho'x" : '🎧 Sokin'} · ${lv} daraja`), el('div', 'dtitle', title), el('div', 'note', artist), el('div', 'focus', '📚 Nima o\'rganasiz: ' + learn));
+  const steps = el('ol', 'popsteps');
+  ["Birinchi marta shunchaki tinglang, nimani tushunganingizni belgilang.", "Ikkinchi marta so'zlari (lyrics) bilan tinglang, 3 ta yangi so'zni yozib oling.", "Uchinchi marta qo'shilib kuylang: tezlikni 0.75x qilib qo'yish mumkin.", "Bitta yoqqan qatorni yod oling va suhbatda ishlating."].forEach(t => steps.append(el('li', null, t)));
+  c.append(steps);
+  const row = el('div', 'drow');
+  row.append(btn('btn primary', "▶ YouTube'da (so'zlari bilan)", () => { openExt(ytLink(title + ' ' + artist + ' lyrics')); }),
+    btn('btn', funDone[id] ? '✓ Tinglandi' : '✓ Tingladim', e => { funMark(id); e.target.textContent = '✓ Tinglandi'; }),
+    btn('btn', '🗣 Suhbatda gaplashish', () => {
+      const qq = `Let's talk about the song "${title}" by ${artist}. Have you listened to it? What is it about, and how does it make you feel?`;
+      turns.push({ role:'assistant', content: JSON.stringify({ emotion:'happy', reply: qq }) }); saveChat();
+      setRoom('talk'); qMsg({ emotion:'happy', reply: qq, praise_uz: '🎵 «' + title + '» haqida suhbat' }); speakTurn({ reply: qq }, true);
+    }));
+  c.append(row, btn('btn', '← Orqaga', back)); box.append(c);
+}
+async function newFun(box, kind){
+  box.innerHTML = ''; stopFunAudio(); const c = el('div', 'dcard'), lv = funLevel(), ws = studiedWords(10);
+  c.append(el('div', 'dstep', (kind === 'song' ? "✨ Qo'shiq yozilmoqda…" : '✨ Ertak yozilmoqda…') + ' (15-40 soniya)'), el('p', 'note', `Daraja: ${lv}. So'zlaringiz: ` + (ws.map(w => w.w).join(', ') || "hali yo'q, oddiy foydali so'zlar")));
+  box.append(c);
+  try {
+    const r = parseJSON(await ai(kind, { level: lv, words: ws.map(w => w.w), seed: Math.floor(Math.random() * 1000) }), null);
+    if (!r || !Array.isArray(r.lines)) throw new Error('bad');
+    const str = (v, n) => String(v || '').slice(0, n);
+    const words = (Array.isArray(r.words) ? r.words : []).filter(x => x && x.w).slice(0, 8).map(x => [str(x.w, 40), str(x.uz, 80)]);
+    const base = { id: 'ai' + Date.now().toString(36), ai: 1, type: kind, lv, day: today(), ic: '✨', t: str(r.title || (kind === 'song' ? 'My Song' : 'My Tale'), 80), focus: str(r.focus, 60), words };
+    let m;
+    if (kind === 'song'){
+      const lines = r.lines.filter(l => l && l.en).slice(0, 24).map(l => [str(l.en, 160), str(l.uz, 200)]);
+      if (lines.length < 6) throw new Error('bad');
+      m = Object.assign(base, { bpm: 92 + Math.floor(Math.random() * 30), lines });
+    } else {
+      const lines = r.lines.filter(l => l && l.en).slice(0, 30).map(l => [/^[NAB]$/.test(String(l.s || '').toUpperCase()) ? String(l.s).toUpperCase() : 'N', str(l.en, 400), str(l.uz, 500)]);
+      if (lines.length < 6) throw new Error('bad');
+      const nm = r.names && typeof r.names === 'object' ? r.names : {};
+      m = Object.assign(base, { names: { A: str(nm.A || 'Ali', 20), B: str(nm.B || 'Zara', 20) }, g: { A: nm.male === 'B' ? 'female' : 'male', B: nm.male === 'B' ? 'male' : 'female' }, lines,
+        qs: (Array.isArray(r.questions) ? r.questions : []).filter(x => x && x.q).slice(0, 3).map(x => [str(x.q, 200), str(x.uz, 200), str(x.a, 200)]) });
+    }
+    funMine = [m].concat(funMine).slice(0, 20); LS.set('funMine', funMine);
+    if (kind === 'song') runSong(box, songOf(m), renderFun); else runEpisode(box, taleEp(m), renderFun);
+  } catch(e){
+    c.append(el('div', 'dres bad', e.code ? errText(e) : "Tayyorlab bo'lmadi. Qayta urinib ko'ring."), btn('btn primary', 'Qayta', () => newFun(box, kind)), btn('btn', 'Orqaga', renderFun));
+  }
+}
+
 /* ---- the daily 10-minute lesson ---- */
 const LESSON = [
   { id:'words', ic:'📚', t:"So'zlar", d:'2 daq' },
@@ -4218,13 +4956,14 @@ function renderDrill(){
   const steps = el('div', 'lsteps');
   LESSON.forEach(s => { const x = el('div', 'lstep' + (l.done.includes(s.id) ? ' on' : '')); x.append(el('span', null, l.done.includes(s.id) ? '✓' : s.ic), el('small', null, s.t)); steps.append(x); });
   c.append(steps);
-  c.append(full ? el('div', 'dres good', "✅ Bugungi dars tugadi! Ertaga yana. Xohlasangiz pastdagi mashqlarni qiling.") : btn('btn primary big', l.done.length ? 'Davom ettirish' : 'Boshlash', () => runLesson(box)));
+  c.append(full ? el('div', 'dres good', "✅ Bugungi dars tugadi! Bonus sifatida bitta ertak yoki qo'shiq tinglang 🎵") : btn('btn primary big', l.done.length ? 'Davom ettirish' : 'Boshlash', () => runLesson(box)));
   box.append(c);
   const cards = [
     ['🎙', 'Audio dars (2-3 daqiqa)', "O'rgangan so'zlaringizdan dialog yoki hikoya: ikki xil ovoz, gapma-gap tarjima, takrorlab tinglash rejimi.", () => renderEpisodes(box)],
     ['⚡', 'Tez tarjima', "O'zbekcha gapni 5 soniyada inglizcha ayting. Gapni tarjima qilmasdan, to'g'ridan-to'g'ri aytishga o'rgatadi.", () => runTranslate(box, 8)],
     ['🦜', 'Soya mashqi', 'Eshiting va darhol takrorlang. Talaffuz va ravonlik uchun eng tez usul.', () => runShadow(box, shadowItems(6))],
-    ['🎧', 'Tinglash', "1 daqiqalik hikoya va 2 ta savol. Bot ham har kuni ertalab yuboradi.", () => runListen(box)]
+    ['🎧', 'Tinglash', "1 daqiqalik hikoya va 2 ta savol. Bot ham har kuni ertalab yuboradi.", () => runListen(box)],
+    ['🎵', "Ertak va qo'shiqlar", "Darajangizga mos sho'x ertaklar, kuy bilan qo'shiqlar va mashhur qo'shiqlar ro'yxati.", () => setRoom('fun')]
   ];
   cards.forEach(([ic, t, d, fn]) => { const b = btn('dpick', '', fn); b.append(el('span', 'dic', ic), el('b', null, t), el('small', null, d)); box.append(b); });
   refillBank();

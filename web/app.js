@@ -142,6 +142,8 @@ function errText(e){
     : e.code === 'rate_limited' ? "Biroz shoshildik. Bir necha soniyadan keyin qayta urinib ko'ring."
     : e.code === 'quota' ? "Bugungi bepul suhbat tugadi. Ertaga yana gaplashamiz!"
     : e.code === 'auth' ? "Mini Appni yopib, qayta oching."
+    : e.code === 'busy' ? "Server hozir band. Bir daqiqadan keyin qayta urinib ko'ring."
+    : e.code === 'upstream' ? "AI hozir javob bermadi. Bir ozdan keyin qayta urinib ko'ring."
     : "Internet bilan muammo bo'ldi. Qayta urinib ko'ring.";
 }
 
@@ -670,9 +672,9 @@ function coreDaily(force){
 }
 const packItems = p => p.list || p.items.split(';').map(s => { const [w, uz, ex] = s.split('|'); return { w, uz, ex }; });
 const hasWord = w => words.some(x => x.w.toLowerCase() === String(w).toLowerCase().trim());
-function addWords(list, src){
+function addWords(list, src, max){
   const added = [];
-  (Array.isArray(list) ? list : []).slice(0,3).forEach(w => {
+  (Array.isArray(list) ? list : []).slice(0, max || 3).forEach(w => {
     if (!w || !w.w) return; const key = String(w.w).toLowerCase().trim();
     if (key.length < 2 || key.length > 60 || hasWord(key)) return;
     const item = { w:String(w.w).trim(), uz:String(w.uz||'').trim(), ex:String(w.ex||'').trim(), box:0, due:today(), src:src||'' };
@@ -1146,10 +1148,11 @@ CH.paint($('avatarSvg'), settings.char, true);
 
 /* ================= rooms, settings ================= */
 function setRoom(r){
-  room = r; stopListen(); stopDrill();
+  room = r; stopListen(); stopDrill(); stopFunAudio();
   document.querySelectorAll('.nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.room === r));
-  $('room-talk').hidden = r !== 'talk'; $('room-words').hidden = r !== 'words'; $('room-drill').hidden = r !== 'drill';
+  $('room-talk').hidden = r !== 'talk'; $('room-words').hidden = r !== 'words'; $('room-drill').hidden = r !== 'drill'; $('room-fun').hidden = r !== 'fun';
   if (r === 'drill'){ stopSpeaking(); renderDrill(); return; }
+  if (r === 'fun'){ stopSpeaking(); renderFun(); return; }
   if (r === 'words'){ stopSpeaking(); queue = []; renderWordsRoom(); }
   else { status('', micBlocked ? 'Javob yozing' : 'Tugmani bosing va gapiring'); renderTargets(); }
 }
@@ -1233,7 +1236,7 @@ async function initTelegram(){
     $('level').value = settings.level; $('goal').value = String(settings.goal); $('rate').value = String(settings.rate);
     renderGoal(); renderBadge(); renderTopics(); startTalk(false); setTimeout(testNudge, 1200);
     const start = new URLSearchParams(location.search).get('room') || (TG.initDataUnsafe && TG.initDataUnsafe.start_param);
-    if (start === 'words' || start === 'drill'){ setRoom(start); sync(); }
+    if (start === 'words' || start === 'drill' || start === 'fun'){ setRoom(start); sync(); }
     if (start === 'audio'){ setRoom('drill'); renderEpisodes($('drill')); sync(); }
   } catch(e){ status('', errText(e)); }
   window.addEventListener('pagehide', () => { if (syncT){ clearTimeout(syncT); pushState(); } });
@@ -1527,12 +1530,16 @@ function lineHtml(text, ep){
   return span;
 }
 let epRate = LS.get('epRate', 0.9);
-function runEpisode(box, ep){
+function runEpisode(box, ep, back){
   box.innerHTML = '';
-  const c = el('div', 'dcard ep');
-  const gOf = s => ep.kind === 'story' ? (wantMale() ? 'male' : 'female') : (s === ep.male ? 'male' : 'female');
-  c.append(el('div', 'dstep', (ep.kind === 'story' ? '📖 Hikoya' : '💬 Dialog') + ` · ${ep.lines.length} gap · ~${Math.max(1, Math.round(ep.lines.reduce((a, l) => a + l.en.split(' ').length, 0) / 120))} daqiqa`), el('div', 'dtitle', ep.title));
-  if (ep.words.length) { const kw = el('div', 'epwords'); kw.append(el('span', 'tl', "O'rgangan so'zlaringiz:")); ep.words.forEach(x => kw.append(el('span', 'tw', x.w))); c.append(kw); }
+  const c = el('div', 'dcard ep'), tale = ep.kind === 'tale';
+  const narr = wantMale() ? 'male' : 'female';
+  const gOf = s => (ep.g && ep.g[s]) || (s === 'N' || ep.kind === 'story' ? narr : s === ep.male ? 'male' : 'female');
+  c.append(el('div', 'dstep', (tale ? '📖 Ertak' + (ep.lv ? ' · ' + ep.lv : '') : ep.kind === 'story' ? '📖 Hikoya' : '💬 Dialog') + ` · ${ep.lines.length} gap · ~${Math.max(1, Math.round(ep.lines.reduce((a, l) => a + l.en.split(' ').length, 0) / 120))} daqiqa`), el('div', 'dtitle', (ep.ic ? ep.ic + ' ' : '') + ep.title));
+  if (ep.focus) c.append(el('div', 'focus', '📚 Dars: ' + ep.focus));
+  if (ep.words.length) { const kw = el('div', 'epwords'); kw.append(el('span', 'tl', tale ? "Yangi so'zlar:" : "O'rgangan so'zlaringiz:")); ep.words.forEach(x => { const t = btn('tw', x.w, () => { dnote(c, x.w + ' — ' + (x.uz || '')); speakParts([{ text: x.w, rate: 0.85 }]); }); kw.append(t); });
+    if (tale) kw.append(btn('tool', "➕ Lug'atga", () => { const a = addWords(ep.words, 'tale', 10); dnote(c, a.length ? `${a.length} ta so'z lug'atingizga qo'shildi.` : "Bu so'zlar lug'atingizda bor."); }));
+    c.append(kw); }
   const ctl = el('div', 'drow epctl');
   let playing = false, run = 0, from = 0, repeatMode = LS.get('epRepeat', false), showUz = false;
   const playBtn = btn('btn primary', '▶ Tinglash', () => playing ? stop() : play(from));
@@ -1542,8 +1549,8 @@ function runEpisode(box, ep){
   ctl.append(playBtn, speedBtn, repBtn, uzBtn, volBtn()); c.append(ctl);
   const list = el('div', 'eplines');
   const rows = ep.lines.map((l, i) => {
-    const r = el('div', 'epl ' + (ep.kind === 'story' ? 'n' : l.s === 'A' ? 'a' : 'b'));
-    if (ep.kind !== 'story') r.append(el('div', 'who', ep.names[l.s] || l.s));
+    const r = el('div', 'epl ' + (ep.kind === 'story' || l.s === 'N' ? 'n' : l.s === 'A' ? 'a' : 'b'));
+    if (ep.kind !== 'story' && l.s !== 'N') r.append(el('div', 'who', ep.names[l.s] || l.s));
     const t = el('div', 'en'); t.append(lineHtml(l.en, ep)); r.append(t, el('div', 'uz', l.uz));
     r.onclick = () => { stop(); from = i; play(i, true); };
     list.append(r); return r;
@@ -1563,7 +1570,7 @@ function runEpisode(box, ep){
       if (one && !repeatMode) { playing = false; playBtn.textContent = '▶ Davom ettirish'; from = k + 1; return; }
     }
     playing = false; from = 0; mark(-1); playBtn.textContent = '▶ Yana tinglash';
-    ep.plays = (ep.plays || 0) + 1; LS.set('episodes', episodes);
+    ep.plays = (ep.plays || 0) + 1; if (ep.save) ep.save(); else LS.set('episodes', episodes);
     showQs();
   }
   const qs = el('div', 'epqs'); c.append(qs);
@@ -1582,7 +1589,7 @@ function runEpisode(box, ep){
     }));
   }
   if (ep.plays) showQs();
-  const foot = el('div', 'drow'); foot.append(btn('btn', '← Orqaga', () => { stop(); renderEpisodes(box); })); c.append(foot);
+  const foot = el('div', 'drow'); foot.append(btn('btn', '← Orqaga', () => { stop(); back ? back() : renderEpisodes(box); })); c.append(foot);
   box.append(c);
 }
 async function newEpisode(box, kind){
@@ -1604,6 +1611,208 @@ function renderEpisodes(box){
   }
   box.append(btn('btn', '← Mashqlarga', renderDrill));
 }
+/* ================= Ertak · Qo'shiq: tales and songs by level ================= */
+let funDone = LS.get('funDone', {}), funMine = LS.get('funMine', []), funTab = LS.get('funTab', 'tales'), funLv = null;
+const funLevel = () => funLv || vlevel();
+const funMark = id => { funDone[id] = (funDone[id] || 0) + 1; LS.set('funDone', funDone); };
+function openExt(url){ try { if (TG && TG.openLink) return TG.openLink(url); } catch(e){} window.open(url, '_blank', 'noopener'); }
+const ytLink = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
+/* a tale from the library (or one the AI wrote) in the audio-lesson player format */
+function taleEp(t){
+  return { id: t.id, kind: 'tale', lv: t.lv, ic: t.ic, title: t.t, focus: t.focus, names: Object.assign({ N: 'Narrator' }, t.names || {}), g: t.g || {},
+    lines: t.lines.map(([s, en, uz]) => ({ s, en, uz })), words: (t.words || []).map(([w, uz]) => ({ w, uz })),
+    questions: (t.qs || []).map(([q, uz, a]) => ({ q, uz, a })), plays: funDone[t.id] || 0, save(){ funMark(t.id); } };
+}
+
+/* ---- a tiny synthesizer: melodies for sing-along and a drum beat for chants (volume follows the volume setting) ---- */
+let synthOut = null, tuneNodes = [], beatT = null, noiseBuf = null;
+function synthBus(){
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
+  if (!synthOut){ synthOut = actx.createGain(); synthOut.connect(actx.destination); }
+  synthOut.gain.value = vol() * 0.55; return synthOut;
+}
+function stopTune(){ tuneNodes.forEach(n => { try { n.stop(); } catch(e){} }); tuneNodes = []; }
+function stopBeat(){ clearInterval(beatT); beatT = null; }
+function stopFunAudio(){ stopTune(); stopBeat(); }
+/* plays one line of notes, resolves when it ends; returns its length in seconds too */
+function playTune(notes, bpm){
+  const out = synthBus(), ns = FUN.parseNotes(notes), spb = 60 / bpm; let t = actx.currentTime + 0.06;
+  ns.forEach(n => {
+    const d = n.d * spb;
+    if (n.f){
+      const o = actx.createOscillator(), o2 = actx.createOscillator(), g = actx.createGain(), g2 = actx.createGain();
+      o.type = 'triangle'; o.frequency.value = n.f; o2.type = 'sine'; o2.frequency.value = n.f * 2; g2.gain.value = 0.18;
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.55, t + 0.02); g.gain.exponentialRampToValueAtTime(0.28, t + Math.max(0.05, d * 0.5)); g.gain.linearRampToValueAtTime(0.0001, t + d * 0.95);
+      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(out); o.start(t); o2.start(t); o.stop(t + d); o2.stop(t + d); tuneNodes.push(o, o2);
+    }
+    t += d;
+  });
+  const len = t - actx.currentTime;
+  return { len, done: sleep(len * 1000) };
+}
+function noise(){ if (!noiseBuf){ noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.3, actx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } const s = actx.createBufferSource(); s.buffer = noiseBuf; return s; }
+function drum(kind, t, out){
+  if (kind === 'kick'){ const o = actx.createOscillator(), g = actx.createGain(); o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.14); g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.22); o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.25); return; }
+  const s = noise(), f = actx.createBiquadFilter(), g = actx.createGain(), hat = kind === 'hat';
+  f.type = hat ? 'highpass' : 'bandpass'; f.frequency.value = hat ? 7000 : 1800;
+  g.gain.setValueAtTime(hat ? 0.12 : 0.38, t); g.gain.exponentialRampToValueAtTime(0.001, t + (hat ? 0.04 : 0.13));
+  s.connect(f); f.connect(g); g.connect(out); s.start(t); s.stop(t + 0.15);
+}
+function startBeat(bpm){
+  stopBeat(); const out = synthBus(), step8 = 60 / bpm / 2; let next = actx.currentTime + 0.08, k = 0;
+  beatT = setInterval(() => {
+    while (next < actx.currentTime + 0.25){
+      drum('hat', next, out); if (k === 0 || k === 4 || k === 5) drum('kick', next, out); if (k === 2 || k === 6) drum('snare', next, out);
+      next += step8; k = (k + 1) % 8;
+    }
+  }, 60);
+}
+
+/* ---- the room ---- */
+function renderFun(){
+  if (room !== 'fun') return;
+  const box = $('fun'); box.innerHTML = ''; stopFunAudio(); stopSpeaking();
+  const lv = funLevel(), done = id => (funDone[id] || 0) > 0;
+  const nDone = FUN.TALES.concat(FUN.SONGS).filter(x => done(x.id)).length;
+  $('fSub').textContent = nDone ? `${nDone} ta ertak va qo'shiq tinglangan` : "Darajangizga mos ertak va qo'shiqlar";
+  const tabs = el('div', 'vtabs');
+  VLEVELS.forEach(l => { const all = FUN.TALES.concat(FUN.SONGS).filter(x => x.lv === l), d = all.filter(x => done(x.id)).length;
+    const b = btn('vtab' + (l === lv ? ' on' : ''), '', () => { funLv = l; renderFun(); }); const bar = el('i'); bar.style.setProperty('--p', (d / all.length * 100).toFixed(0) + '%');
+    b.append(el('b', null, l), el('small', null, `${d}/${all.length}`), bar); tabs.append(b); });
+  box.append(tabs);
+  if (lv !== vlevel()) box.append(el('p', 'note', `Sizning darajangiz: ${vlevel()}. Bu yerda ${lv} darajadagilar.`));
+  /* today's pick: the first tale and song at this level not heard yet */
+  const t1 = FUN.TALES.find(x => x.lv === lv && !done(x.id)), s1 = FUN.SONGS.find(x => x.lv === lv && !done(x.id));
+  if (t1 || s1){
+    const c = el('div', 'dcard funpick'); c.append(el('div', 'dstep', '⭐ Bugungi tavsiya'));
+    const row = el('div', 'drow');
+    if (t1) row.append(btn('btn primary', t1.ic + ' ' + t1.t, () => runEpisode(box, taleEp(t1), renderFun)));
+    if (s1) row.append(btn('btn', s1.ic + ' ' + s1.t, () => runSong(box, songOf(s1), renderFun)));
+    c.append(row); box.append(c);
+  }
+  const seg = el('div', 'fseg');
+  [['tales', "📖 Ertaklar"], ['songs', "🎵 Qo'shiqlar"], ['pop', '⭐ Mashhur'], ['mine', '✨ Meniki']].forEach(([id, t]) => seg.append(btn('segb' + (funTab === id ? ' on' : ''), t, () => { funTab = id; LS.set('funTab', id); renderFun(); })));
+  box.append(seg);
+  const item = (ic, t, sub, fn, isDone, fun) => { const b = btn('dpick' + (isDone ? ' done' : ''), '', fn); b.append(el('span', 'dic', ic), el('b', null, t + (fun ? ' 😄' : '') + (isDone ? ' ✓' : '')), el('small', null, sub)); box.append(b); };
+  if (funTab === 'tales'){
+    box.append(el('p', 'note', "Avval matnsiz tinglang, keyin 🇺🇿 Tarjima bilan tekshiring. 🔁 Takrorlab rejimida har gapni qaytaring. Oxirida 3 ta savolga ovoz bilan javob bering."));
+    FUN.TALES.filter(x => x.lv === lv).forEach(t => item(t.ic, t.t, `${t.focus} · ${t.lines.length} gap` + (funDone[t.id] ? ` · ${funDone[t.id]} marta` : ''), () => runEpisode(box, taleEp(t), renderFun), done(t.id), t.fun));
+    box.append(btn('btn primary', "✨ So'zlarimdan yangi ertak", () => newFun(box, 'tale')));
+  } else if (funTab === 'songs'){
+    box.append(el('p', 'note', "🎵 Kuy: ohang chalinadi, siz qo'shilib kuylaysiz. 🥁 Ritm: baraban ostida o'qiladi. 🎤 Navbat: bir qator men, bir qator siz."));
+    FUN.SONGS.filter(x => x.lv === lv).forEach(s => item(s.ic, s.t, s.focus + (s.lines.some(l => l[2]) ? ' · 🎵 kuy bor' : ' · 🥁 ritm'), () => runSong(box, songOf(s), renderFun), done(s.id), s.fun));
+    box.append(btn('btn primary', "✨ So'zlarimdan yangi qo'shiq", () => newFun(box, 'song')));
+  } else if (funTab === 'pop'){
+    box.append(el('p', 'note', "Haqiqiy qo'shiqlar YouTube'da so'zlari bilan ochiladi. Usul: 1) shunchaki tinglang, 2) so'zlarini o'qib tinglang, 3) qo'shilib kuylang, 4) bitta qatorini yod oling."));
+    const list = FUN.POP.filter(x => x[2] === lv); (list.length ? list : FUN.POP).forEach(p => { const id = 'pop:' + p[0]; item(p[3] ? '🔥' : '🎧', p[0], p[1] + ' · ' + p[4], () => runPop(box, p, renderFun), done(id)); });
+  } else {
+    box.append(el('p', 'note', "Bu yerda AI siz o'rgangan so'zlardan yozgan ertak va qo'shiqlar saqlanadi (oxirgi 20 ta)."));
+    const row = el('div', 'drow'); row.append(btn('btn primary', '✨ Yangi ertak', () => newFun(box, 'tale')), btn('btn primary', "✨ Yangi qo'shiq", () => newFun(box, 'song'))); box.append(row);
+    funMine.forEach(m => item(m.type === 'song' ? '🎤' : '📖', m.t, `${m.lv} · ${m.day || ''} · ${m.focus || ''}`, () => m.type === 'song' ? runSong(box, songOf(m), renderFun) : runEpisode(box, taleEp(m), renderFun), done(m.id)));
+  }
+}
+const songOf = s => ({ id: s.id, t: s.t, ic: s.ic, lv: s.lv, focus: s.focus, bpm: s.bpm || 104, ai: s.ai, words: (s.words || []).map(([w, uz]) => ({ w, uz })), lines: s.lines.map(([en, uz, notes]) => ({ en, uz, notes })) });
+
+let funRate = LS.get('funRate', 1);
+function runSong(box, s, back){
+  box.innerHTML = ''; stopFunAudio(); stopSpeaking();
+  const hasTune = s.lines.some(l => l.notes), c = el('div', 'dcard ep song');
+  c.append(el('div', 'dstep', `🎵 Qo'shiq · ${s.lv}` + (s.ai ? ' · ✨ AI yozgan' : '')), el('div', 'dtitle', s.ic + ' ' + s.t));
+  if (s.focus) c.append(el('div', 'focus', '📚 Dars: ' + s.focus));
+  if (s.words.length){ const kw = el('div', 'epwords'); kw.append(el('span', 'tl', "So'zlar:")); s.words.forEach(x => kw.append(btn('tw', x.w, () => { dnote(c, x.w + ' — ' + (x.uz || '')); speakParts([{ text: x.w, rate: 0.85 }]); })));
+    kw.append(btn('tool', "➕ Lug'atga", () => { const a = addWords(s.words, 'song', 10); dnote(c, a.length ? `${a.length} ta so'z lug'atingizga qo'shildi.` : "Bu so'zlar lug'atingizda bor."); })); c.append(kw); }
+  let mode = hasTune ? 'tune' : 'beat', run = 0, playing = false, showUz = false;
+  const modes = el('div', 'fseg');
+  const MODES = [['tune', '🎵 Kuy'], ['beat', '🥁 Ritm'], ['turn', '🎤 Navbat'], ['slow', "🐢 Sekin o'qish"]].filter(m => m[0] !== 'tune' || hasTune);
+  const paintModes = () => modes.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+  MODES.forEach(([m, t]) => { const b = btn('segb', t, () => { mode = m; paintModes(); stop(); play(0); }); b.dataset.m = m; modes.append(b); });
+  c.append(modes); paintModes();
+  const ctl = el('div', 'drow epctl');
+  const playBtn = btn('btn primary', '▶ Boshlash', () => playing ? stop() : play(0));
+  const rateBtn = btn('btn', '⏱ ' + funRate + 'x', () => { funRate = funRate >= 1.2 ? 0.8 : funRate >= 1 ? 1.2 : 1; LS.set('funRate', funRate); rateBtn.textContent = '⏱ ' + funRate + 'x'; });
+  const uzBtn = btn('btn', '🇺🇿 Tarjima', () => { showUz = !showUz; list.classList.toggle('showuz', showUz); });
+  ctl.append(playBtn, rateBtn, uzBtn, volBtn()); c.append(ctl);
+  const list = el('div', 'eplines');
+  const rows = s.lines.map((l, i) => { const r = el('div', 'epl n sl'); r.append(el('div', 'en', l.en), el('div', 'uz', l.uz), el('i', 'sbar')); r.onclick = () => { stop(); play(i, true); }; list.append(r); return r; });
+  c.append(list);
+  const your = el('div', 'yourturn', '🎤 Endi siz kuylang!'); your.hidden = true; c.append(your);
+  const mark = (i, len) => rows.forEach((r, k) => { r.classList.toggle('cur', k === i); const b = r.querySelector('.sbar'); b.style.transition = 'none'; b.style.width = '0';
+    if (k === i){ r.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); if (len){ void b.offsetWidth; b.style.transition = `width ${len}s linear`; b.style.width = '100%'; } } });
+  function stop(){ run++; playing = false; stopFunAudio(); stopSpeaking(); your.hidden = true; playBtn.textContent = '▶ Boshlash'; }
+  async function sayLine(l, rate){ await speakParts([{ text: l.en.replace(/\(.*?\)/g, ''), rate }]); }
+  async function play(i, one){
+    const my = ++run; playing = true; playBtn.textContent = '⏸ To\'xtatish';
+    const bpm = s.bpm * funRate;
+    try { synthBus(); } catch(e){}
+    if (mode === 'beat') startBeat(bpm);
+    for (let k = i; k < s.lines.length; k++){
+      if (run !== my) return; const l = s.lines[k];
+      if ((mode === 'tune' || mode === 'turn') && l.notes){
+        const t = playTune(l.notes, bpm); mark(k, t.len); await t.done;
+        if (mode === 'turn'){ if (run !== my) return; your.hidden = false; mark(k, t.len); await sleep(t.len * 1000 + 400); your.hidden = true; }
+      } else {
+        mark(k); await sayLine(l, mode === 'slow' ? 0.7 : 0.92 * funRate);
+        if (run !== my) return;
+        if (mode === 'turn'){ your.hidden = false; await sleep(Math.min(7000, 1000 + l.en.split(' ').length * 480)); your.hidden = true; }
+        else await sleep(mode === 'slow' ? 700 : mode === 'beat' ? 120 : 250);
+      }
+      if (one) break;
+    }
+    if (run !== my) return;
+    stop(); mark(-1);
+    if (!one){ funMark(s.id); dnote(c, "👏 Barakalla! Endi 🎤 Navbat rejimida o'zingiz kuylab ko'ring yoki YouTube'da asl ijroni tinglang."); }
+  }
+  const foot = el('div', 'drow');
+  if (!s.ai) foot.append(btn('btn', "▶ YouTube'da tinglash", () => openExt(ytLink(s.t + ' song with lyrics'))));
+  foot.append(btn('btn', '← Orqaga', () => { stop(); back(); }));
+  c.append(foot); box.append(c);
+}
+function runPop(box, p, back){
+  box.innerHTML = ''; stopFunAudio(); stopSpeaking();
+  const [title, artist, lv, hot, learn] = p, id = 'pop:' + title, c = el('div', 'dcard');
+  c.append(el('div', 'dstep', `${hot ? "🔥 Sho'x" : '🎧 Sokin'} · ${lv} daraja`), el('div', 'dtitle', title), el('div', 'note', artist), el('div', 'focus', '📚 Nima o\'rganasiz: ' + learn));
+  const steps = el('ol', 'popsteps');
+  ["Birinchi marta shunchaki tinglang, nimani tushunganingizni belgilang.", "Ikkinchi marta so'zlari (lyrics) bilan tinglang, 3 ta yangi so'zni yozib oling.", "Uchinchi marta qo'shilib kuylang: tezlikni 0.75x qilib qo'yish mumkin.", "Bitta yoqqan qatorni yod oling va suhbatda ishlating."].forEach(t => steps.append(el('li', null, t)));
+  c.append(steps);
+  const row = el('div', 'drow');
+  row.append(btn('btn primary', "▶ YouTube'da (so'zlari bilan)", () => { openExt(ytLink(title + ' ' + artist + ' lyrics')); }),
+    btn('btn', funDone[id] ? '✓ Tinglandi' : '✓ Tingladim', e => { funMark(id); e.target.textContent = '✓ Tinglandi'; }),
+    btn('btn', '🗣 Suhbatda gaplashish', () => {
+      const qq = `Let's talk about the song "${title}" by ${artist}. Have you listened to it? What is it about, and how does it make you feel?`;
+      turns.push({ role:'assistant', content: JSON.stringify({ emotion:'happy', reply: qq }) }); saveChat();
+      setRoom('talk'); qMsg({ emotion:'happy', reply: qq, praise_uz: '🎵 «' + title + '» haqida suhbat' }); speakTurn({ reply: qq }, true);
+    }));
+  c.append(row, btn('btn', '← Orqaga', back)); box.append(c);
+}
+async function newFun(box, kind){
+  box.innerHTML = ''; stopFunAudio(); const c = el('div', 'dcard'), lv = funLevel(), ws = studiedWords(10);
+  c.append(el('div', 'dstep', (kind === 'song' ? "✨ Qo'shiq yozilmoqda…" : '✨ Ertak yozilmoqda…') + ' (15-40 soniya)'), el('p', 'note', `Daraja: ${lv}. So'zlaringiz: ` + (ws.map(w => w.w).join(', ') || "hali yo'q, oddiy foydali so'zlar")));
+  box.append(c);
+  try {
+    const r = parseJSON(await ai(kind, { level: lv, words: ws.map(w => w.w), seed: Math.floor(Math.random() * 1000) }), null);
+    if (!r || !Array.isArray(r.lines)) throw new Error('bad');
+    const str = (v, n) => String(v || '').slice(0, n);
+    const words = (Array.isArray(r.words) ? r.words : []).filter(x => x && x.w).slice(0, 8).map(x => [str(x.w, 40), str(x.uz, 80)]);
+    const base = { id: 'ai' + Date.now().toString(36), ai: 1, type: kind, lv, day: today(), ic: '✨', t: str(r.title || (kind === 'song' ? 'My Song' : 'My Tale'), 80), focus: str(r.focus, 60), words };
+    let m;
+    if (kind === 'song'){
+      const lines = r.lines.filter(l => l && l.en).slice(0, 24).map(l => [str(l.en, 160), str(l.uz, 200)]);
+      if (lines.length < 6) throw new Error('bad');
+      m = Object.assign(base, { bpm: 92 + Math.floor(Math.random() * 30), lines });
+    } else {
+      const lines = r.lines.filter(l => l && l.en).slice(0, 30).map(l => [/^[NAB]$/.test(String(l.s || '').toUpperCase()) ? String(l.s).toUpperCase() : 'N', str(l.en, 400), str(l.uz, 500)]);
+      if (lines.length < 6) throw new Error('bad');
+      const nm = r.names && typeof r.names === 'object' ? r.names : {};
+      m = Object.assign(base, { names: { A: str(nm.A || 'Ali', 20), B: str(nm.B || 'Zara', 20) }, g: { A: nm.male === 'B' ? 'female' : 'male', B: nm.male === 'B' ? 'male' : 'female' }, lines,
+        qs: (Array.isArray(r.questions) ? r.questions : []).filter(x => x && x.q).slice(0, 3).map(x => [str(x.q, 200), str(x.uz, 200), str(x.a, 200)]) });
+    }
+    funMine = [m].concat(funMine).slice(0, 20); LS.set('funMine', funMine);
+    if (kind === 'song') runSong(box, songOf(m), renderFun); else runEpisode(box, taleEp(m), renderFun);
+  } catch(e){
+    c.append(el('div', 'dres bad', e.code ? errText(e) : "Tayyorlab bo'lmadi. Qayta urinib ko'ring."), btn('btn primary', 'Qayta', () => newFun(box, kind)), btn('btn', 'Orqaga', renderFun));
+  }
+}
+
 /* ---- the daily 10-minute lesson ---- */
 const LESSON = [
   { id:'words', ic:'📚', t:"So'zlar", d:'2 daq' },
@@ -1653,13 +1862,14 @@ function renderDrill(){
   const steps = el('div', 'lsteps');
   LESSON.forEach(s => { const x = el('div', 'lstep' + (l.done.includes(s.id) ? ' on' : '')); x.append(el('span', null, l.done.includes(s.id) ? '✓' : s.ic), el('small', null, s.t)); steps.append(x); });
   c.append(steps);
-  c.append(full ? el('div', 'dres good', "✅ Bugungi dars tugadi! Ertaga yana. Xohlasangiz pastdagi mashqlarni qiling.") : btn('btn primary big', l.done.length ? 'Davom ettirish' : 'Boshlash', () => runLesson(box)));
+  c.append(full ? el('div', 'dres good', "✅ Bugungi dars tugadi! Bonus sifatida bitta ertak yoki qo'shiq tinglang 🎵") : btn('btn primary big', l.done.length ? 'Davom ettirish' : 'Boshlash', () => runLesson(box)));
   box.append(c);
   const cards = [
     ['🎙', 'Audio dars (2-3 daqiqa)', "O'rgangan so'zlaringizdan dialog yoki hikoya: ikki xil ovoz, gapma-gap tarjima, takrorlab tinglash rejimi.", () => renderEpisodes(box)],
     ['⚡', 'Tez tarjima', "O'zbekcha gapni 5 soniyada inglizcha ayting. Gapni tarjima qilmasdan, to'g'ridan-to'g'ri aytishga o'rgatadi.", () => runTranslate(box, 8)],
     ['🦜', 'Soya mashqi', 'Eshiting va darhol takrorlang. Talaffuz va ravonlik uchun eng tez usul.', () => runShadow(box, shadowItems(6))],
-    ['🎧', 'Tinglash', "1 daqiqalik hikoya va 2 ta savol. Bot ham har kuni ertalab yuboradi.", () => runListen(box)]
+    ['🎧', 'Tinglash', "1 daqiqalik hikoya va 2 ta savol. Bot ham har kuni ertalab yuboradi.", () => runListen(box)],
+    ['🎵', "Ertak va qo'shiqlar", "Darajangizga mos sho'x ertaklar, kuy bilan qo'shiqlar va mashhur qo'shiqlar ro'yxati.", () => setRoom('fun')]
   ];
   cards.forEach(([ic, t, d, fn]) => { const b = btn('dpick', '', fn); b.append(el('span', 'dic', ic), el('b', null, t), el('small', null, d)); box.append(b); });
   refillBank();

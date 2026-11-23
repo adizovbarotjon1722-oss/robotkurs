@@ -158,6 +158,7 @@ const ENGINES = {
   mistral: { key: () => process.env.MISTRAL_API_KEY, run: (m, x) => compatChat('mistral', m, x), label: 'Mistral' },
   openai: { key: () => C.openaiKey, run: (m, x) => openaiLike('openai', 'https://api.openai.com/v1/chat/completions', C.openaiKey, C.openaiChatModel, m, x), label: 'OpenAI' }
 };
+const PAID = ['anthropic', 'openai'];
 const DEFAULT_ORDER = ['anthropic', 'gemini', 'groq', 'cerebras', 'mistral', 'openrouter', 'openai'];
 const speed = {}; /* seconds each AI took in the start-up test; failed ones are missing */
 function order() {
@@ -165,6 +166,9 @@ function order() {
     /* fastest working AI first; AI_PROVIDER stays first only if it works and answers within 8 s */
     const fav = String(process.env.AI_PROVIDER || '').toLowerCase();
     const ok = Object.keys(speed).filter((s) => ENGINES[s].key()).sort((a, b) => speed[a] - speed[b]);
+    /* a paid AI (Claude, OpenAI) that works goes first: better teaching beats a second of speed.
+       AI_PREFER_PAID=0 turns this off. */
+    if (process.env.AI_PREFER_PAID !== '0') PAID.slice().reverse().forEach((p) => { if (ok.includes(p) && speed[p] <= 20) ok.splice(ok.indexOf(p), 1), ok.unshift(p); });
     if (ok.includes(fav) && speed[fav] <= 8) ok.splice(ok.indexOf(fav), 1), ok.unshift(fav);
     return ok.concat(DEFAULT_ORDER.filter((s) => !ok.includes(s) && ENGINES[s].key()));
   }
@@ -217,9 +221,9 @@ function whyText(e) {
   return 'internet xatosi: ' + String((e.cause && e.cause.code) || e.message || e.code).slice(0, 80);
 }
 /* try every AI at once with a tiny request */
-async function checkAI() {
+async function checkAI(only) {
   const ping = [{ role: 'user', content: 'Reply only with this JSON: {"ok":true}' }];
-  return Promise.all(Object.keys(ENGINES).map(async (name) => {
+  return Promise.all(Object.keys(ENGINES).filter((n) => !only || only.includes(n)).map(async (name) => {
     const r = { id: name, label: ENGINES[name].label };
     if (!ENGINES[name].key()) return Object.assign(r, { status: 'nokey' });
     const t0 = Date.now();
@@ -230,15 +234,48 @@ async function checkAI() {
     } catch (e) { delete speed[name]; resting.set(name, Date.now() + 2 * 60000); return Object.assign(r, { status: 'fail', why: whyText(e) }); }
   }));
 }
+/* AIs that failed at start-up (no credit yet, a limit, a network hiccup) are tried again every 30 minutes,
+   so one that starts working (for example after you add credit) joins by itself; every 6 hours all are re-measured. */
+let healthT = null, healthN = 0;
+function healthLoop() {
+  if (healthT) return;
+  healthT = setInterval(() => {
+    healthN++;
+    const names = healthN % 12 === 0 ? null : Object.keys(ENGINES).filter((n) => ENGINES[n].key() && speed[n] == null);
+    if (names && !names.length) return;
+    checkAI(names).then((r) => { const back = r.filter((x) => x.status === 'ok').map((x) => x.label); if (back.length && names) console.log('AI qayta ishga tushdi: ' + back.join(', ')); }).catch(() => {});
+  }, 30 * 60000);
+  healthT.unref();
+}
 async function selfTest() {
+  healthLoop();
   const res = await checkAI();
   res.forEach((r) => console.log('  ' + r.label + ': ' + (r.status === 'nokey' ? "kalit yo'q" : r.status === 'ok' ? 'ishlayapti ✓ (' + r.sec + ' s)' : 'ISHLAMAYAPTI ✗ (' + r.why + ')')));
   if (C.openaiKey && resting.get('openai') > Date.now()) voiceDown();
   console.log('Navbat (eng tezi birinchi): ' + order().filter((s) => speed[s] != null).join(' → ') + (order().some((s) => speed[s] == null) ? ' | zaxirada: ' + order().filter((s) => speed[s] == null).join(', ') : ''));
 }
 
-/* type + data in, text out. The prompt is always built here from a whitelist. */
+/* At most AI_CONCURRENCY requests go out at once (free plans punish bursts); the rest wait in line for up to 60 s. */
+const MAX_PAR = Math.max(1, +process.env.AI_CONCURRENCY || 6);
+let active = 0; const waiting = [];
+function slot() {
+  if (active < MAX_PAR) { active++; return Promise.resolve(); }
+  return new Promise((res, rej) => {
+    const w = { res, t: setTimeout(() => { const i = waiting.indexOf(w); if (i >= 0) waiting.splice(i, 1); rej(new ApiError('busy', 503)); }, 60000) };
+    waiting.push(w);
+  });
+}
+function release() { const w = waiting.shift(); if (w) { clearTimeout(w.t); w.res(); } else active = Math.max(0, active - 1); }
+/* the same request from the same person while the first is still running (a double tap) shares one answer */
+const inflight = new Map();
 async function runAI(user, type, payload) {
+  const key = user.id + '|' + type + '|' + crypto.createHash('sha1').update(JSON.stringify(payload || {})).digest('base64');
+  if (inflight.has(key)) return inflight.get(key);
+  const p = runAI1(user, type, payload).finally(() => inflight.delete(key));
+  inflight.set(key, p); return p;
+}
+/* type + data in, text out. The prompt is always built here from a whitelist. */
+async function runAI1(user, type, payload) {
   if (!prompts.TYPES.includes(type)) throw new ApiError('bad_type');
   const q = quota(user);
   if (q.left <= 0) { console.log("AI: kunlik limit tugadi (" + q.max + " ta). Ko'paytirish: .env da FREE_DAILY_AI=500 yoki ADMIN_IDS ga Telegram ID ingizni yozing"); throw new ApiError('quota', 402); }
@@ -246,8 +283,10 @@ async function runAI(user, type, payload) {
   try { b = prompts.build(type, payload); } catch (e) { throw new ApiError('bad_payload'); }
   const t0 = Date.now();
   let text;
+  await slot();
   try { text = await complete(b.messages, b.max); }
   catch (e) { console.log('AI: ' + type + ' ✗ hech bir AI javob bermadi (' + (e.code || e.message) + ')'); throw e; }
+  finally { release(); }
   console.log('AI: ' + type + ' ✓ ' + lastEngine + ' ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
   db.addUsage(user.id, today(), 1, 0, 0);
   return { text, quota: quota(user) };
@@ -494,6 +533,8 @@ function setKey(id, value) {
   if (id === 'GEMINI_API_KEY') { geminiTtsModel = ''; delete freeDown.gemini; }
   if (id === 'OPENAI_API_KEY') voiceOffUntil = 0;
   console.log('Kalit yangilandi: ' + def.label + (v ? ' (' + mask(v) + ')' : " (o'chirildi)"));
+  /* measure the new key right away, so a working paid AI takes the lead without a restart */
+  if (v && ENGINES[def.engine]) checkAI([def.engine]).catch(() => {});
   return keyList();
 }
 /* everything at once: every AI, speech-to-text and the live voice */

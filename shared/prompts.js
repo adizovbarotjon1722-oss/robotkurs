@@ -375,6 +375,32 @@ Reply ONLY JSON:
  "questions": 3 questions about the ${dialog ? 'dialogue' : 'story'} that need a short spoken answer, as [{"q": English, "uz": Uzbek, "a": short model answer in English}]}` }] };
   }
 
+  /* A fairy tale or fable for listening, at the learner's level, with their studied words. */
+  function tale(p) {
+    const level = lvl(p.level);
+    const ws = (Array.isArray(p.words) ? p.words : []).slice(0, 10).map((w) => clip(w, 30).replace(/[<>"]/g, '')).filter(Boolean);
+    const kinds = ['a funny Nasreddin Afandi story (the clever, funny Uzbek folk hero)', 'a classic animal fable with a clear moral', 'a fairy tale with magic and a happy ending', 'a funny folk tale about a greedy rich man and a clever poor man', 'a modern fable about an engineer, a robot and a lazy computer', 'a funny story about a talking cat who wants to be a boss', 'a tale about three brothers and a magic object', 'a funny story about a donkey who is smarter than his owner'];
+    const kind = kinds[Math.abs(+p.seed || 0) % kinds.length];
+    return { max: 2400, messages: [{ role: 'user', content: `Write ${kind}, ORIGINAL (not a copy of a known modern book), for an Uzbek adult learning English at ${level} level, to listen to for about 2 minutes (180-300 English words). It must be fun, lively and surprising, with short spoken sentences, a narrator and 2 characters who talk. Grammar and words must fit ${level}.${ws.length ? ` Naturally use some of these studied words: ${ws.join(', ')}.` : ''}
+Reply ONLY JSON:
+{"title": 2-6 word English title,
+ "names": {"A": first character's name, "B": second character's name, "male": "A" or "B" (who is male)},
+ "lines": [{"s": "N" for narrator, "A" or "B", "en": one or two sentences, "uz": natural Uzbek translation (Latin script)}] (12-20 lines),
+ "focus": the main grammar point the tale practises, in English, max 6 words,
+ "words": 5 useful words from the tale [{"w": word, "uz": Uzbek}],
+ "questions": 3 questions [{"q": English, "uz": Uzbek, "a": short model answer}]}` }] };
+  }
+
+  /* An original, catchy learning song (a chant on a beat) built from the learner's words. */
+  function song(p) {
+    const level = lvl(p.level);
+    const ws = (Array.isArray(p.words) ? p.words : []).slice(0, 10).map((w) => clip(w, 30).replace(/[<>"]/g, '')).filter(Boolean);
+    const moods = ['a happy, bouncy pop song', 'a funny rap about a bad day at work', 'a cheerful travel song', 'an energetic morning song to wake up', 'a funny song about coffee and deadlines', 'a calm, sweet song about home', 'a football-stadium chant', 'a silly song about a lost suitcase'];
+    const mood = moods[Math.abs(+p.seed || 0) % moods.length];
+    return { max: 1400, messages: [{ role: 'user', content: `Write ${mood}, ORIGINAL lyrics (do not copy any existing song), for an Uzbek adult learning English at ${level} level. 12-16 short lines (4-9 words each), strong rhythm and rhymes, a chorus that repeats twice, easy to chant on a beat. Grammar and words must fit ${level}.${ws.length ? ` Use as many of these studied words as fit: ${ws.join(', ')}.` : ''}
+Reply ONLY JSON: {"title": 2-5 word title, "lines": [{"en": line, "uz": Uzbek translation (Latin script)}], "focus": grammar point, max 6 words, "words": up to 6 [{"w","uz"}]}` }] };
+  }
+
   /* How close a spoken sentence is to the target (word by word, order kept). Used by shadowing and quick translation. */
   const CONTR = { "i'm": 'i am', "you're": 'you are', "we're": 'we are', "they're": 'they are', "he's": 'he is', "she's": 'she is', "it's": 'it is', "that's": 'that is', "what's": 'what is', "there's": 'there is', "let's": 'let us', "don't": 'do not', "doesn't": 'does not', "didn't": 'did not', "can't": 'can not', "cannot": 'can not', "won't": 'will not', "isn't": 'is not', "aren't": 'are not', "wasn't": 'was not', "weren't": 'were not', "i'll": 'i will', "you'll": 'you will', "we'll": 'we will', "it'll": 'it will', "i've": 'i have', "we've": 'we have', "you've": 'you have', "i'd": 'i would', "you'd": 'you would', "couldn't": 'could not', "wouldn't": 'would not', "shouldn't": 'should not', "haven't": 'have not', "hasn't": 'has not', "gonna": 'going to', "wanna": 'want to' };
   const NUM = { one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' };
@@ -393,7 +419,7 @@ Reply ONLY JSON:
     return { score, words: marks };
   }
 
-  const BUILDERS = { chat, mnemonic, recap, ask, test, sentences, story, episode };
+  const BUILDERS = { chat, mnemonic, recap, ask, test, sentences, story, episode, tale, song };
   function build(type, payload) {
     const f = pick(BUILDERS, type, null);
     if (!f) throw new Error('unknown type');

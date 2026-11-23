@@ -162,6 +162,20 @@ Server `.env` dagi barcha AI kalitlarini ishlatadi: Claude, Gemini, Groq, Cerebr
 ### AI kalitlarini Mini App'dan almashtirish
 ADMIN_IDS dagi odam Mini App → Sozlamalar ichida **"AI kalitlari"** bo'limini ko'radi. U yerda har bir AI uchun yangi kalit kiritish, o'chirish va **"Hammasini tekshirish"** tugmasi bor: qaysi AI ishlayapti, nechchi soniyada javob beradi, ovoz ishlayaptimi, ishlamasa nega. Kalit darhol ishlaydi, qayta deploy kerak emas. Kalitlar bazada shifrlangan holda turadi (shifr BOT_TOKEN dan olinadi: BOT_TOKEN ni almashtirsangiz, ilovada kiritilgan kalitlarni qayta kiriting). Boshqa foydalanuvchilar bu bo'limni ko'rmaydi va server ularga ruxsat bermaydi.
 
+## Ertak va qo'shiqlar (2026-11-23)
+Pastki menyuda to'rtinchi bo'lim: **Ertak·Qo'shiq** (botda `/ertak`). Hammasi A1, A2, B1, B2 darajalarga bo'lingan, har birida "📚 Dars" (qaysi grammatika mashq qilinadi) va yangi so'zlar bor.
+- **20 ta ertak** (`web/fun.js`): Ezop masallari, aka-uka Grimm, Andersen va Afandi latifalari, o'rganuvchi uchun qayta yozilgan. Hikoyachi va qahramonlar turli ovozda, gapma-gap tarjima, takrorlab tinglash, 3 ta savol va "Lug'atga qo'shish".
+- **26 ta xalq qo'shig'i** (mualliflik huquqi tugagan). 15 tasida kuy bor: ilova o'zi ohangni chaladi (🎵 Kuy), 🎤 Navbat rejimida bir qatorni ilova, keyingisini siz kuylaysiz; qolganlari 🥁 Ritm (baraban ostida o'qish). Tezlik 0.8x-1.2x.
+- **47 ta mashhur qo'shiq** ro'yxati (Bruno Mars, Ed Sheeran, Queen, Adele…): nima o'rganiladi, qanday tinglash kerak, YouTube'da so'zlari bilan ochish va suhbatda muhokama.
+- **✨ AI yozgan ertak va qo'shiqlar**: o'rgangan so'zlaringizdan, tanlangan darajada (AI turlari `tale`, `song`). Oxirgi 20 tasi "Meniki" bo'limida.
+
+## Barqarorlik va pullik AI (2026-11-23)
+- Bir vaqtda ko'pi bilan `AI_CONCURRENCY` (standart 6) ta AI so'rovi yuboriladi, qolganlari 60 soniyagacha navbatda turadi (bepul limitlar to'lib qolmasligi uchun).
+- Bir xil so'rov ikki marta bosilsa (ikki marta tegish), bitta javob ikkalasiga beriladi, limit bir marta sarflanadi.
+- Ishga tushishda ishlamagan AI har 30 daqiqada qayta tekshiriladi; hammasi har 6 soatda qayta o'lchanadi. Kredit qo'shsangiz, qayta ishga tushirmasdan o'zi qo'shiladi.
+- **Pullik AI ulash**: Mini App → Sozlamalar → "AI kalitlari" (faqat egasi ko'radi) → Claude (`ANTHROPIC_API_KEY`) yoki OpenAI (`OPENAI_API_KEY`) kalitini kiriting. Kalit darhol tekshiriladi va ishlasa, navbatda birinchi turadi (bepullar zaxiraga o'tadi). Model: `CLAUDE_MODEL` (standart `claude-haiku-5-5`), `OPENAI_CHAT_MODEL`. O'chirish: `AI_PREFER_PAID=0`.
+- OpenAI'da kredit bo'lsa, botning ovozli javoblari ham ishlaydi.
+
 ## Mini Appni o'z kompyuteringizda ochish
 Telegram Mini Appni faqat https manzildan ochadi. Kompyuterda bepul Cloudflare tunnel shu manzilni beradi:
 1. Bir marta o'rnating: `winget install --id Cloudflare.cloudflared` (terminalni yopib qayta oching).
