@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const db = require('./db');
 const S = require('./services');
+const PRON = require('./pron');
 const bot = require('./bot');
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -201,6 +202,14 @@ async function apiRoute(req, res, url) {
     if (q.length < 3) return json(res, 400, { error: 'bad_query' });
     try { return json(res, 200, { ids: await S.ytFind(q) }); }
     catch (e) { return json(res, 502, { error: 'yt' }); }
+  }
+
+  /* Uzbek-letter readings for words the page's own list doesn't have: GET /api/pron?w=word1,word2 */
+  if (url.pathname === '/api/pron' && req.method === 'GET') {
+    if (!allow('pron' + user.id, 30)) return json(res, 429, { error: 'rate_limited' });
+    const list = String(url.searchParams.get('w') || '').toLowerCase().split(',').map((w) => w.trim()).filter((w) => /^[a-z][a-z']{0,30}$/.test(w)).slice(0, 60);
+    const out = {}; list.forEach((w) => { out[w] = PRON.word(w); });
+    return json(res, 200, { pron: out });
   }
 
   /* ---- owner only: AI keys and their health ---- */

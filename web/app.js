@@ -24,6 +24,51 @@ async function api(path, body, raw){
   if (!r.ok){ let j = {}; try { j = await r.json(); } catch(e){} const err = new Error(j.error || 'http'); err.code = j.error || (r.status === 429 ? 'rate_limited' : r.status === 401 ? 'auth' : 'http'); throw err; }
   return r;
 }
+/* ================= o'qilishi: how English reads in Uzbek letters ("deadline" → "dedlayn") =================
+   PRON (web/pron.js) holds the words the app's own texts use; inside Telegram the server's full
+   dictionary (126 000 words) fills in the rest, and the answers are kept on the phone. */
+const pronMore = LS.get('pron', {});
+const pronAsk = new Set(); let pronT = null, pronWait = [];
+const pClean = w => String(w).toLowerCase().replace(/[’`]/g, "'").replace(/^'+|'+$/g, '');
+function pronWord(w){
+  w = pClean(w); if (!w) return '';
+  const get = x => (typeof PRON !== 'undefined' && PRON[x]) || pronMore[x];
+  let r = get(w);
+  if (r) return r;
+  if (w.endsWith("'s") && (r = get(w.slice(0, -2)))) return r + 'z';
+  if (/[^s]s$/.test(w) && (r = get(w.slice(0, -1)))) return r + (/[ptkfs]$/.test(r) ? 's' : 'z');
+  if (SERVER && !(w in pronMore) && /^[a-z][a-z']{0,30}$/.test(w)) pronAsk.add(w);
+  return '';
+}
+/* a word or a sentence; null when nothing is known. Unknown words in a sentence keep their spelling. */
+function uzr(t){
+  t = String(t || '').replace(/\(.*?\)/g, ''); let known = 0, all = 0;
+  const out = t.replace(/[A-Za-z][A-Za-z'’]*/g, (x, at) => {
+    all++; let r = pronWord(x); if (r) known++; else r = x.toLowerCase();
+    return all > 1 && /^\s*$|[.!?]\s*$/.test(t.slice(0, at)) ? r.charAt(0).toUpperCase() + r.slice(1) : r;
+  }).replace(/\s+/g, ' ').trim();
+  if (!known || (all === 1 && out.toLowerCase() === pClean(t.trim()))) return null;
+  return all > 1 ? out.charAt(0).toUpperCase() + out.slice(1) : out;
+}
+function pronFetch(){
+  pronT = null; if (!pronAsk.size) return;
+  const list = [...pronAsk].slice(0, 60); list.forEach(w => pronAsk.delete(w));
+  api('/api/pron?w=' + encodeURIComponent(list.join(','))).then(r => r.json()).then(j => {
+    list.forEach(w => { pronMore[w] = (j.pron && j.pron[w]) || ''; });
+    const keys = Object.keys(pronMore); if (keys.length > 4000) keys.slice(0, keys.length - 4000).forEach(k => delete pronMore[k]);
+    LS.set('pron', pronMore);
+    const w = pronWait; pronWait = []; w.forEach(f => f());
+    if (pronAsk.size) pronT = setTimeout(pronFetch, 300);
+  }).catch(() => { pronWait = []; });
+}
+/* the reading as a small line under the English: "🔤 dedlayn" */
+function rdEl(t, cls){
+  const e = el('div', cls || 'rd');
+  const fill = () => { const r = uzr(t); e.textContent = r ? (cls === 'rdl' ? r : cls === 'rdi' ? ' [' + r + ']' : '🔤 ' + r) : ''; e.hidden = !r; };
+  const before = pronAsk.size; fill();
+  if (pronAsk.size > before || [...String(t).matchAll(/[A-Za-z][A-Za-z'’]*/g)].some(m => pronAsk.has(pClean(m[0])))){ pronWait.push(fill); if (!pronT) pronT = setTimeout(pronFetch, 250); }
+  return e;
+}
 function pushState(){ syncT = null; if (!synced) return; const d = { _base: syncBase }; SYNC_KEYS.forEach(k => d[k] = LS.get(k, null)); api('/api/state', d).catch(() => {}); }
 
 const settings = Object.assign({ level:'B1', goal:10, rate:0.95, voice:'', key:'', oakey:'', readUz:true, handsfree:true, style:'samimiy', topic:'free', corrections:'all', calm:true, lang:'both', gender:'auto' }, LS.get('settings', {}));
@@ -720,11 +765,11 @@ function renderCard(box){
   let flipped = false;
   const deck = el('div','deck'), card = el('div','card'); card.tabIndex = 0; card.setAttribute('role','button'); card.setAttribute('aria-label','Kartochkani aylantirish');
   const front = el('div','face'), back = el('div','face back');
-  front.append(el('div','box', BOXNAME[cur.box] || ''), el('div','big', cur.w));
+  front.append(el('div','box', BOXNAME[cur.box] || ''), el('div','big', cur.w), rdEl(cur.w, 'rd rdbig'));
   if (cur.sound) front.append(el('div','sound', '[' + cur.sound + ']'));
   front.append(el('div','hint',"Bosing va tarjimasini ko'ring"));
-  back.append(el('div','big', cur.w), el('div','uz', cur.uz));
-  if (cur.ex) back.append(el('div','ex', cur.ex));
+  back.append(el('div','big', cur.w), rdEl(cur.w), el('div','uz', cur.uz));
+  if (cur.ex) back.append(el('div','ex', cur.ex), rdEl(cur.ex, 'rd rdex'));
   if (cur.trick) back.append(el('div','trick', cur.trick));
   card.append(front, back); deck.append(card); box.append(deck);
   const rate = el('div','rate'); rate.hidden = true;
@@ -751,6 +796,7 @@ function renderQuiz(box){
   const opts = others.concat([cur]).sort(() => Math.random() - 0.5);
   const qz = el('div','quiz');
   qz.append(el('div','box', reverse ? 'Inglizchasini toping' : "Ma'nosini toping"), el('div','qword', reverse ? cur.uz : cur.w));
+  if (!reverse) qz.append(rdEl(cur.w));
   if (!reverse) setTimeout(() => speak(cur.w, 0.85), 250);
   let answered = false;
   opts.forEach(o => {
@@ -886,7 +932,7 @@ function renderKnown(box){
   const p = el('div','known');
   p.append(el('p','note',"Biladigan so'zlaringizni bosing. Ular yodlanganlar qatoriga o'tadi va bir oydan keyin bir marta tekshiriladi. Qolganlari navbat bilan o'rgatiladi."));
   const chips = el('div','chips');
-  next40.forEach(x => { const c = btn('chip', x.w, () => { pick.has(x) ? pick.delete(x) : pick.add(x); c.classList.toggle('on', pick.has(x)); }); c.title = x.uz; chips.append(c); });
+  next40.forEach(x => { const c = btn('chip', x.w, () => { pick.has(x) ? pick.delete(x) : pick.add(x); c.classList.toggle('on', pick.has(x)); }); c.title = x.uz + (uzr(x.w) ? ' · o\'qilishi: ' + uzr(x.w) : ''); chips.append(c); });
   p.append(chips);
   const row = el('div','cacts');
   row.append(btn('btn primary', 'Saqlash', () => {
@@ -938,13 +984,23 @@ function renderWordList(){
   const box = $('wordList'); box.innerHTML = '';
   if (!words.length){ box.append(el('p','empty',"Hali so'z yo'q.")); return; }
   words.slice().reverse().slice(0, 80).forEach(w => {
-    const r = el('div','wrow'); const left = el('div'); left.append(el('b', null, w.w), el('small', null, ' — ' + w.uz));
+    const r = el('div','wrow'); const left = el('div'); left.append(el('b', null, w.w)); left.append(rdEl(w.w, 'rdi'), el('small', null, ' — ' + w.uz));
     const lv = el('div','lv'); lv.title = BOXNAME[w.box]; for (let i = 1; i <= 5; i++) lv.append(el('i', w.box >= i ? 'on' : ''));
     r.append(left, lv); box.append(r);
   });
 }
 function renderBadge(){ const n = due().length; $('dueBadge').hidden = !n; $('dueBadge').textContent = n; }
-function renderWordsRoom(){ renderPractice(); renderCourse(); renderPacks(); renderWordList(); renderBadge(); }
+/* a small lookup: type any English word or sentence, see how it reads and hear it */
+function renderPronBox(){
+  const box = $('pronBox'); if (!box || box.childElementCount) return;
+  const inp = el('input', 'winput'); inp.type = 'text'; inp.placeholder = 'Inglizcha so\'z yoki gap…'; inp.setAttribute('autocapitalize', 'off'); inp.spellcheck = false; inp.maxLength = 200;
+  const out = el('div', 'pronout'); let t = null;
+  const show = () => { out.replaceChildren(); const v = inp.value.trim(); if (!v) return; const r = rdEl(v, 'rd rdbig'); out.append(r, btn('tool', '🔊 Tinglash', () => speakParts([{ text: v, rate: 0.85 }])));
+    if (r.hidden && !SERVER) out.append(el('p', 'note', "Bu so'z ichki lug'atda yo'q: Telegram ilovasida to'liq lug'at (126 ming so'z) ishlaydi.")); };
+  inp.oninput = () => { clearTimeout(t); t = setTimeout(show, 350); };
+  box.append(inp, out, el('p', 'note', "O'qilishi taxminiy: inglizcha tovushlarni o'zbek harflari bilan yozdik. «th» s yoki z deb yozilgan, lekin til uchini tishlar orasiga qo'yib aytiladi; «w» u deb yozilgan, lablar dumaloq bo'ladi."));
+}
+function renderWordsRoom(){ renderPronBox(); renderPractice(); renderCourse(); renderPacks(); renderWordList(); renderBadge(); }
 document.querySelectorAll('[data-wm]').forEach(b => b.onclick = () => { stopDrill(); wmode = b.dataset.wm; document.querySelectorAll('[data-wm]').forEach(x => x.setAttribute('aria-pressed', x === b)); renderPractice(); });
 
 /* ================= words by voice =================
@@ -963,7 +1019,8 @@ function renderVoice(box){
   const bars = el('div','bars'); for (let i = 0; i < 5; i++) bars.append(el('i'));
   const step = el('div','step', list.length ? `${list.length} ta so'z tayyor` : "Hamma so'zlar yodlangan!");
   const big = el('div','big', list[0] ? list[0].w : '🎉'), uz = el('div','uz', list[0] ? list[0].uz : ''), ex = el('div','ex', list[0] ? list[0].ex : '');
-  card.append(bars, step, big, uz, ex); p.append(card);
+  const rdw = el('div'); if (list[0]) rdw.append(rdEl(list[0].w));
+  card.append(bars, step, big, rdw, uz, ex); p.append(card);
   const bl = el('button','vbtn listen'); bl.append(el('span',null,'Tinglab yodlash'), el('small',null,"Yo'lda, quloqchinda"));
   const bs = el('button','vbtn speak'); bs.append(el('span',null,'Gapirib yodlash'), el('small',null, micBlocked ? 'Mikrofon kerak' : 'Aytib, eslab qolish'));
   bl.disabled = bs.disabled = !list.length; if (micBlocked) bs.disabled = true;
@@ -971,7 +1028,7 @@ function renderVoice(box){
   const btns = el('div','vbtns'); btns.append(bl, bs); p.append(btns, stopB);
   if (micBlocked) p.append(el('p','note',"Gapirib yodlash uchun mikrofon kerak: Telegram versiyasida yoki faylni Chrome'da oching. Tinglab yodlash hamma joyda ishlaydi."));
   box.append(p);
-  const ui = { card, step, big, uz, ex, show(w, hideEn, label){ step.textContent = label; big.textContent = w.w; uz.textContent = w.uz; ex.textContent = w.ex || ''; big.classList.toggle('hide', !!hideEn); ex.classList.toggle('hide', !!hideEn); } };
+  const ui = { card, step, big, uz, ex, show(w, hideEn, label){ step.textContent = label; big.textContent = w.w; rdw.replaceChildren(rdEl(w.w)); rdw.classList.toggle('hide', !!hideEn); uz.textContent = w.uz; ex.textContent = w.ex || ''; big.classList.toggle('hide', !!hideEn); ex.classList.toggle('hide', !!hideEn); } };
   bl.onclick = () => { btns.hidden = true; stopB.hidden = false; runListen(list, ui); };
   bs.onclick = () => { btns.hidden = true; stopB.hidden = false; runSpeak(list, ui); };
 }
@@ -1393,7 +1450,7 @@ function runTranslate(box, n, onDone){
       const r = P.compareSpoken(it.en, t); const good = r.score >= 75; if (good) ok++;
       c.querySelectorAll('.drow').forEach(x => x.remove());
       c.append(el('div', 'dsaid', '🗣 ' + t), el('div', good ? 'dres good' : 'dres bad', (good ? "✅ To'g'ri! " : '🔁 ') + r.score + '%'));
-      markWords(c, r);
+      markWords(c, r); c.append(rdEl(it.en, 'rd rdex'));
       speakParts([{ text: it.en, rate: 0.95 }]);
       const row = el('div', 'drow'); row.append(btn('btn', '🔊', () => speakParts([{ text: it.en }])), btn('btn primary', i + 1 < items.length ? 'Keyingisi →' : 'Natija', () => { i++; step(); })); c.append(row);
     };
@@ -1414,10 +1471,10 @@ function runShadow(box, items, onDone){
     const c = el('div', 'dcard');
     let hide = LS.get('shadowHide', false);
     const txt = el('div', 'den' + (hide ? ' blur' : ''), it.en);
-    c.append(el('div', 'dstep', `🦜 Soya mashqi · ${i + 1}/${items.length} · eshiting va xuddi shunday takrorlang`), txt, el('div', 'tquz', it.uz || ''));
+    c.append(el('div', 'dstep', `🦜 Soya mashqi · ${i + 1}/${items.length} · eshiting va xuddi shunday takrorlang`), txt, rdEl(it.en, 'rd rdex' + (hide ? ' blur' : '')), el('div', 'tquz', it.uz || ''));
     const play = r => speakParts([{ text: it.en, rate: r }]);
     const tools = el('div', 'drow');
-    tools.append(btn('btn', '🔊 Eshitish', () => play(settings.rate)), btn('btn', '🐢 Sekin', () => play(0.7)), btn('tool', hide ? "Matnni ko'rsat" : 'Matnsiz (qiyinroq)', e => { hide = !hide; LS.set('shadowHide', hide); txt.classList.toggle('blur', hide); e.target.textContent = hide ? "Matnni ko'rsat" : 'Matnsiz (qiyinroq)'; }));
+    tools.append(btn('btn', '🔊 Eshitish', () => play(settings.rate)), btn('btn', '🐢 Sekin', () => play(0.7)), btn('tool', hide ? "Matnni ko'rsat" : 'Matnsiz (qiyinroq)', e => { hide = !hide; LS.set('shadowHide', hide); txt.classList.toggle('blur', hide); const rx = c.querySelector('.rdex'); if (rx) rx.classList.toggle('blur', hide); e.target.textContent = hide ? "Matnni ko'rsat" : 'Matnsiz (qiyinroq)'; }));
     c.append(tools);
     let tries = 0;
     sayBox(c, t => {
@@ -1442,7 +1499,7 @@ function runWordCheck(box, n, onDone){
     if (i >= list.length) return drillDone(box, "So'z takrorlash", ok, list.length, onDone);
     const w = list[i]; box.innerHTML = '';
     const c = el('div', 'dcard quiz');
-    c.append(el('div', 'dstep', `📚 So'zlar · ${i + 1}/${list.length}`), el('div', 'qword', w.w));
+    c.append(el('div', 'dstep', `📚 So'zlar · ${i + 1}/${list.length}`), el('div', 'qword', w.w), rdEl(w.w));
     setTimeout(() => speakParts([{ text: w.w, rate: 0.85 }]), 200);
     const opts = new Set([w.uz]); for (let k = 0; k < 40 && opts.size < 4; k++) opts.add(pool[Math.floor(Math.random() * pool.length)].uz);
     let done = false;
@@ -1530,6 +1587,13 @@ function lineHtml(text, ep){
   return span;
 }
 let epRate = LS.get('epRate', 0.9);
+/* "🔤 O'qilishi" shows the Uzbek-letter reading under every line (remembered) */
+function rdBtn(getList){
+  let on = LS.get('showRd', false);
+  const b = btn('btn' + (on ? ' on2' : ''), "🔤 O'qilishi", () => { on = !on; LS.set('showRd', on); b.classList.toggle('on2', on); getList().classList.toggle('showrd', on); });
+  setTimeout(() => { const l = getList(); if (l) l.classList.toggle('showrd', on); }, 0);
+  return b;
+}
 function runEpisode(box, ep, back){
   box.innerHTML = '';
   const c = el('div', 'dcard ep'), tale = ep.kind === 'tale';
@@ -1546,12 +1610,12 @@ function runEpisode(box, ep, back){
   const speedBtn = btn('btn', '🐢 ' + epRate + 'x', () => { epRate = epRate >= 1 ? 0.75 : epRate >= 0.9 ? 1 : 0.9; LS.set('epRate', epRate); speedBtn.textContent = '🐢 ' + epRate + 'x'; });
   const repBtn = btn('btn' + (repeatMode ? ' on2' : ''), '🔁 Takrorlab', () => { repeatMode = !repeatMode; LS.set('epRepeat', repeatMode); repBtn.classList.toggle('on2', repeatMode); dnote(c, repeatMode ? "Har gapdan keyin pauza bo'ladi: ovoz chiqarib takrorlang (soya mashqi)." : 'Uzluksiz tinglash.'); });
   const uzBtn = btn('btn', '🇺🇿 Tarjima', () => { showUz = !showUz; list.classList.toggle('showuz', showUz); });
-  ctl.append(playBtn, speedBtn, repBtn, uzBtn, volBtn()); c.append(ctl);
+  ctl.append(playBtn, speedBtn, repBtn, uzBtn, rdBtn(() => list), volBtn()); c.append(ctl);
   const list = el('div', 'eplines');
   const rows = ep.lines.map((l, i) => {
     const r = el('div', 'epl ' + (ep.kind === 'story' || l.s === 'N' ? 'n' : l.s === 'A' ? 'a' : 'b'));
     if (ep.kind !== 'story' && l.s !== 'N') r.append(el('div', 'who', ep.names[l.s] || l.s));
-    const t = el('div', 'en'); t.append(lineHtml(l.en, ep)); r.append(t, el('div', 'uz', l.uz));
+    const t = el('div', 'en'); t.append(lineHtml(l.en, ep)); r.append(t, rdEl(l.en, 'rdl'), el('div', 'uz', l.uz));
     r.onclick = () => { stop(); from = i; play(i, true); };
     list.append(r); return r;
   });
@@ -1781,9 +1845,9 @@ function runSong(box, s, back){
   const playBtn = btn('btn primary', '▶ Boshlash', () => playing ? stop() : play(0));
   const rateBtn = btn('btn', '⏱ ' + funRate + 'x', () => { funRate = funRate >= 1.2 ? 0.8 : funRate >= 1 ? 1.2 : 1; LS.set('funRate', funRate); rateBtn.textContent = '⏱ ' + funRate + 'x'; });
   const uzBtn = btn('btn', '🇺🇿 Tarjima', () => { showUz = !showUz; list.classList.toggle('showuz', showUz); });
-  ctl.append(playBtn, rateBtn, uzBtn, volBtn()); c.append(ctl);
+  ctl.append(playBtn, rateBtn, uzBtn, rdBtn(() => list), volBtn()); c.append(ctl);
   const list = el('div', 'eplines');
-  const rows = s.lines.map((l, i) => { const r = el('div', 'epl n sl'); r.append(el('div', 'en', l.en), el('div', 'uz', l.uz), el('i', 'sbar')); r.onclick = () => { stop(); play(i, true); }; list.append(r); return r; });
+  const rows = s.lines.map((l, i) => { const r = el('div', 'epl n sl'); r.append(el('div', 'en', l.en), rdEl(l.en, 'rdl'), el('div', 'uz', l.uz), el('i', 'sbar')); r.onclick = () => { stop(); play(i, true); }; list.append(r); return r; });
   c.append(list);
   const your = el('div', 'yourturn', '🎤 Endi siz kuylang!'); your.hidden = true; c.append(your);
   const mark = (i, len) => rows.forEach((r, k) => { r.classList.toggle('cur', k === i); const b = r.querySelector('.sbar'); b.style.transition = 'none'; b.style.width = '0';

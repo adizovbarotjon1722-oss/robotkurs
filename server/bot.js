@@ -11,12 +11,23 @@ const PREMIUM_DAYS = +process.env.PREMIUM_DAYS || 30;
 const ADMINS = String(process.env.ADMIN_IDS || '').split(',').map((s) => +s.trim()).filter(Boolean);
 let appUrl = '';
 
-async function tg(method, body) {
-  const r = await fetch(API + method, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}), signal: AbortSignal.timeout(method === 'getUpdates' ? 45000 : 20000) });
+/* one quiet retry when the network drops for a moment (seen as "fetch failed" in the reminder logs) */
+async function tg(method, body, again) {
+  let r;
+  try {
+    r = await fetch(API + method, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}), signal: AbortSignal.timeout(method === 'getUpdates' ? 45000 : 20000) });
+  } catch (e) {
+    if (again || method === 'getUpdates') throw e;
+    await new Promise((ok) => setTimeout(ok, 2000));
+    return tg(method, body, true);
+  }
   const j = await r.json().catch(() => ({}));
   if (!j.ok) throw new Error(method + ': ' + (j.description || r.status));
   return j.result;
 }
+const PRON = require('./pron');
+/* how the word reads in Uzbek letters, shown after it: "deadline [dedlayn]" */
+const rd = (w) => { const r = PRON.text(w); return r && r.toLowerCase() !== String(w).toLowerCase() ? ` <i>[${esc(r.toLowerCase())}]</i>` : ''; };
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 /* without PUBLIC_URL (testing on your own computer) there is no Mini App yet: drop its buttons instead of failing */
 function noAppButtons(extra) {
@@ -103,7 +114,7 @@ async function cmdWords(msg, user) {
   if (!d.length) return say(msg.chat.id, "🎉 Bugungi takrorlash tugagan! Ertaga yana eslataman.");
   /* the same words as a short audio lesson: listen on the way to work */
   sendWordAudio(msg.chat.id, user, d.slice(0, 6)).catch(() => {});
-  await say(msg.chat.id, "🔁 <b>Bugun takrorlash kerak:</b>\n\n" + d.map((x) => `• <b>${esc(x.w)}</b> — <tg-spoiler>${esc(x.uz)}</tg-spoiler>`).join('\n') + "\n\nTarjimasini ko'rish uchun bosing. Tugmali test yoki to'liq mashq:", { reply_markup: { inline_keyboard: [[{ text: '🧠 Test (5 ta savol)', callback_data: 'rv:new:0' }], [appBtn2("📚 Kartochkalarni ochish", 'words')]] } });
+  await say(msg.chat.id, "🔁 <b>Bugun takrorlash kerak:</b>\n\n" + d.map((x) => `• <b>${esc(x.w)}</b>${rd(x.w)} — <tg-spoiler>${esc(x.uz)}</tg-spoiler>`).join('\n') + "\n\nTarjimasini ko'rish uchun bosing. Tugmali test yoki to'liq mashq:", { reply_markup: { inline_keyboard: [[{ text: '🧠 Test (5 ta savol)', callback_data: 'rv:new:0' }], [appBtn2("📚 Kartochkalarni ochish", 'words')]] } });
 }
 async function cmdPremium(msg, user) {
   if (S.isPremium(user)) return say(msg.chat.id, `⭐ Premium faol: ${esc(user.premium_until)} gacha (UTC).`);
@@ -289,7 +300,7 @@ function rvQuestion(st) {
   const rv = st.rv, w = (st.words || []).find((x) => x.w === rv.list[rv.i]);
   if (!w) return null;
   const o = L.options(w, st.words); rv.opts = o.opts; rv.right = o.right;
-  const text = `📚 <b>So'z yodlash</b> · ${rv.i + 1}/${rv.list.length}\n\n🔤 <b>${esc(w.w)}</b>${w.sound ? ' <i>[' + esc(w.sound) + ']</i>' : ''}\n\nMa'nosi qaysi?`;
+  const text = `📚 <b>So'z yodlash</b> · ${rv.i + 1}/${rv.list.length}\n\n🔤 <b>${esc(w.w)}</b>${rd(w.w)}\n\nMa'nosi qaysi?`;
   const kb = o.opts.map((u, i) => [{ text: u, callback_data: 'rv:' + rv.id + ':' + i }]);
   kb.push([{ text: '🤷 Bilmayman', callback_data: 'rv:' + rv.id + ':x' }]);
   return { text, reply_markup: { inline_keyboard: kb } };
@@ -320,7 +331,7 @@ async function onReview(cq, user, id, pick) {
   if (w) L.grade(w, ok);
   if (ok) rv.ok++;
   await tg('answerCallbackQuery', { callback_query_id: cq.id, text: ok ? "✅ To'g'ri!" : '❌ ' + String((w && w.uz) || '').slice(0, 150) }).catch(() => {});
-  const res = w ? (ok ? '✅ ' : '❌ ') + `<b>${esc(w.w)}</b> — ${esc(w.uz)}` + (w.ex ? `\n<i>${esc(w.ex)}</i>` : '') : '';
+  const res = w ? (ok ? '✅ ' : '❌ ') + `<b>${esc(w.w)}</b>${rd(w.w)} — ${esc(w.uz)}` + (w.ex ? `\n<i>${esc(w.ex)}</i>\n🔤 <i>${esc(PRON.text(w.ex))}</i>` : '') : '';
   rv.i++; rv.opts = null;
   let q = null;
   while (rv.i < rv.list.length && !(q = rvQuestion(st))) rv.i++;

@@ -54,7 +54,7 @@ async function claude(messages, max) {
   if (!r.ok) {
     /* only the API's own error text is logged, never the conversation */
     let why = ''; try { const e = await r.json(); why = (e.error && (e.error.type + ': ' + e.error.message)) || ''; } catch (x) {}
-    console.error('anthropic', r.status, why.slice(0, 300));
+    if (!quietChecks) console.error('anthropic', r.status, why.slice(0, 300));
     const err = new ApiError('upstream', 502); err.http = r.status; err.why = why; throw err;
   }
   const j = await r.json();
@@ -72,7 +72,7 @@ async function gemini(messages, max) {
   }, tmo(max));
   if (!r.ok) {
     let why = ''; try { const e = await r.json(); why = (e.error && (e.error.status + ': ' + e.error.message)) || ''; } catch (x) {}
-    console.error('gemini', r.status, why.slice(0, 300));
+    if (!quietChecks) console.error('gemini', r.status, why.slice(0, 300));
     const err = new ApiError(r.status === 429 ? 'rate_limited' : 'upstream', r.status === 429 ? 429 : 502); err.http = r.status; err.why = why; throw err;
   }
   const j = await r.json();
@@ -80,14 +80,17 @@ async function gemini(messages, max) {
   const text = parts.filter((p) => !p.thought).map((p) => p.text || '').join('');
   if (!text.trim()) {
     const c = j.candidates && j.candidates[0];
-    console.error('gemini: bo\'sh javob', (c && c.finishReason) || (j.promptFeedback && j.promptFeedback.blockReason) || '');
+    if (!quietChecks) console.error('gemini: bo\'sh javob', (c && c.finishReason) || (j.promptFeedback && j.promptFeedback.blockReason) || '');
   }
   return text;
 }
 /* OpenAI-compatible chat (Groq, Cerebras, OpenRouter, Mistral, OpenAI) */
 async function openaiLike(name, url, key, model, messages, max, json) {
   if (!key) throw new ApiError('not_configured', 503);
-  const body = { model, messages: messages.map((m) => ({ role: m.role, content: String(m.content) })), max_tokens: Math.min(max || 800, 3000), temperature: 0.8 };
+  const thinks = /gpt-oss|qwen3|deepseek-r1|nemotron|kimi|o[134]-|gpt-5/i.test(model);
+  /* reasoning models spend part of the budget on thinking: without extra room a long answer comes back empty */
+  const body = { model, messages: messages.map((m) => ({ role: m.role, content: String(m.content) })), max_tokens: thinks ? Math.min((max || 800) * 2 + 1200, 8000) : Math.min(max || 800, 3000), temperature: 0.8 };
+  if (thinks && /gpt-oss/i.test(model) && /groq|cerebras|openrouter/.test(name) && !NO_EFFORT.has(name)) body.reasoning_effort = 'low';
   if (json !== false) body.response_format = { type: 'json_object' };
   const r = await withTimeout(url, {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key, 'x-title': 'English Speaking' },
@@ -95,7 +98,7 @@ async function openaiLike(name, url, key, model, messages, max, json) {
   }, tmo(max));
   if (!r.ok) {
     let why = ''; try { const e = await r.json(); why = (e.error && (e.error.message || e.error)) || e.message || ''; } catch (x) {}
-    console.error(name, r.status, String(why).slice(0, 300));
+    if (!quietChecks) console.error(name, r.status, String(why).slice(0, 300));
     const err = new ApiError(r.status === 429 ? 'rate_limited' : 'upstream', r.status === 429 ? 429 : 502);
     err.http = r.status; err.why = String(why); throw err;
   }
@@ -137,12 +140,14 @@ async function pickModel(id, refresh) {
   console.log(id + ' model:', picked[id]);
   return picked[id];
 }
+const NO_EFFORT = new Set();
 async function compatChat(id, m, x) {
   const p = COMPAT[id], key = process.env[p.key], url = p.base + '/chat/completions';
   try { return await openaiLike(id, url, key, await pickModel(id), m, x, p.json); }
   catch (e) {
     if (e.http === 404 || (e.http === 400 && /model/i.test(e.why))) { delete process.env[p.model]; return openaiLike(id, url, key, await pickModel(id, true), m, x, p.json); }
     if (e.http === 400 && p.json !== false && /json|response_format/i.test(e.why)) return openaiLike(id, url, key, await pickModel(id), m, x, false);
+    if (e.http === 400 && /reasoning_effort/i.test(e.why)) { NO_EFFORT.add(id); return openaiLike(id, url, key, await pickModel(id), m, x, p.json); }
     throw e;
   }
 }
@@ -237,13 +242,21 @@ async function checkAI(only) {
 /* AIs that failed at start-up (no credit yet, a limit, a network hiccup) are tried again every 30 minutes,
    so one that starts working (for example after you add credit) joins by itself; every 6 hours all are re-measured. */
 let healthT = null, healthN = 0;
+const nextCheck = {}, failN = {};
+let quietChecks = false;
 function healthLoop() {
   if (healthT) return;
   healthT = setInterval(() => {
-    healthN++;
-    const names = healthN % 12 === 0 ? null : Object.keys(ENGINES).filter((n) => ENGINES[n].key() && speed[n] == null);
+    healthN++; const now = Date.now();
+    const names = healthN % 12 === 0 ? null : Object.keys(ENGINES).filter((n) => ENGINES[n].key() && speed[n] == null && !(nextCheck[n] > now));
     if (names && !names.length) return;
-    checkAI(names).then((r) => { const back = r.filter((x) => x.status === 'ok').map((x) => x.label); if (back.length && names) console.log('AI qayta ishga tushdi: ' + back.join(', ')); }).catch(() => {});
+    quietChecks = true;
+    checkAI(names).then((r) => {
+      r.forEach((x) => {
+        if (x.status === 'ok') { if (failN[x.id] && names) console.log('AI qayta ishga tushdi: ' + x.label); failN[x.id] = 0; delete nextCheck[x.id]; }
+        else if (x.status === 'fail') { failN[x.id] = (failN[x.id] || 0) + 1; nextCheck[x.id] = Date.now() + Math.min(6 * 60, 30 * 2 ** (failN[x.id] - 1)) * 60000; }
+      });
+    }).catch(() => {}).finally(() => { quietChecks = false; });
   }, 30 * 60000);
   healthT.unref();
 }
@@ -251,7 +264,7 @@ async function selfTest() {
   healthLoop();
   const res = await checkAI();
   res.forEach((r) => console.log('  ' + r.label + ': ' + (r.status === 'nokey' ? "kalit yo'q" : r.status === 'ok' ? 'ishlayapti ✓ (' + r.sec + ' s)' : 'ISHLAMAYAPTI ✗ (' + r.why + ')')));
-  if (C.openaiKey && resting.get('openai') > Date.now()) voiceDown();
+  if (C.openaiKey && resting.get('openai') > Date.now()) voiceDown(true);
   console.log('Navbat (eng tezi birinchi): ' + order().filter((s) => speed[s] != null).join(' → ') + (order().some((s) => speed[s] == null) ? ' | zaxirada: ' + order().filter((s) => speed[s] == null).join(', ') : ''));
 }
 
@@ -432,7 +445,7 @@ async function tts(user, text, uz, emotion, speed, format, voice, style) {
         : 'Speak natural, relaxed conversational English like a friend on a phone call, not too fast. ') + (prompts.pick(prompts.STYLES, style) ? 'Speaking style: ' + prompts.STYLES[style].tts + '. ' : '') + 'Mood: ' + mood + '.'
     })
   }, 30000);
-  if (!r.ok) { let why = ''; try { const e = await r.json(); why = (e.error && e.error.message) || ''; } catch (x) {} console.error('tts', r.status, String(why).slice(0, 300)); if (r.status === 401 || r.status === 429 && /quota|credit|billing/i.test(why)) voiceDown(); const err = new ApiError('upstream', 502); err.http = r.status; err.why = why; throw err; }
+  if (!r.ok) { let why = ''; try { const e = await r.json(); why = (e.error && e.error.message) || ''; } catch (x) {} console.error('tts', r.status, String(why).slice(0, 300)); if (r.status === 401 || r.status === 429 && /quota|credit|billing/i.test(why)) voiceDown(true); const err = new ApiError('upstream', 502); err.http = r.status; err.why = why; throw err; }
   db.addUsage(user.id, today(), 0, text.length, 0);
   return Buffer.from(await r.arrayBuffer());
 }
@@ -467,7 +480,7 @@ async function stt(user, buf, mime, seconds, lang, name) {
 
 /* OpenAI voice: on when the key works. Without credit the Mini App uses the phone's own voice instead. */
 let voiceOffUntil = 0;
-const voiceDown = () => { if (voiceOffUntil < Date.now()) console.log("jonli ovoz: OpenAI ishlamadi, bepul ovozga (Groq/Gemini) o'tdim"); voiceOffUntil = Date.now() + 60 * 60000; };
+const voiceDown = (hard) => { if (voiceOffUntil < Date.now()) console.log("jonli ovoz: OpenAI ishlamadi, bepul ovozga (Groq/Gemini) o'tdim"); voiceOffUntil = Date.now() + (hard ? 6 * 60 : 60) * 60000; };
 const voiceOn = () => !!C.openaiKey && voiceOffUntil < Date.now();
 const anyVoice = () => voiceOn() || freeVoiceOn();
 /* at start-up: say "Hi" once to see which free voice works */

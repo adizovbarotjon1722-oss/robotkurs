@@ -176,6 +176,20 @@ Pastki menyuda to'rtinchi bo'lim: **Ertak·Qo'shiq** (botda `/ertak`). Hammasi A
 - **Pullik AI ulash**: Mini App → Sozlamalar → "AI kalitlari" (faqat egasi ko'radi) → Claude (`ANTHROPIC_API_KEY`) yoki OpenAI (`OPENAI_API_KEY`) kalitini kiriting. Kalit darhol tekshiriladi va ishlasa, navbatda birinchi turadi (bepullar zaxiraga o'tadi). Model: `CLAUDE_MODEL` (standart `claude-haiku-5-5`), `OPENAI_CHAT_MODEL`. O'chirish: `AI_PREFER_PAID=0`.
 - OpenAI'da kredit bo'lsa, botning ovozli javoblari ham ishlaydi.
 
+## 🔤 O'qilishi: inglizcha so'z va gaplar o'zbek harflarida (2026-11-27)
+- Har bir so'z va misol gap ostida o'qilishi chiqadi: deadline → **dedlayn**, water → **uotar**, enough → **inaf**. Kartochka, test, ovozli yodlash, "Mening so'zlarim" ro'yxati, soya mashqi va tez tarjimada.
+- Ertak, audio dars va qo'shiqlarda "🔤 O'qilishi" tugmasi har bir qator ostida o'qilishini ko'rsatadi.
+- So'zlar bo'limida "🔤 O'qilishini bilish": istalgan so'z yoki gapni yozing, o'qilishini ko'rasiz va tinglaysiz.
+- Botda /words va /review (test) ham o'qilishini ko'rsatadi.
+- Manba: CMU Pronouncing Dictionary (126 ming so'z, `tools/make_pron.py` o'zbek harflariga o'giradi, litsenziya `tools/CMUDICT-LICENSE`). Ilovada ichki ~5000 so'z, qolgani Telegram ichida serverdan olinadi.
+- O'qilishi taxminiy: «th» s yoki z deb yozilgan (til uchi tishlar orasida aytiladi), «w» u deb yozilgan (lablar dumaloq).
+
+### Tuzatilgan kamchiliklar
+- Groq/OpenRouter'dagi "o'ylaydigan" modellar (gpt-oss) javob o'rniga bo'sh matn qaytarayotgan edi (AI qo'shiq yozolmagan holat): endi ularga yetarli joy va "low reasoning" beriladi.
+- Ishlamayotgan AI'lar har 30 daqiqada qayta tekshirilib, logni to'ldirayotgan edi: endi oraliq 30 daqiqadan 6 soatgacha uzayadi va tekshiruv xatolari logga yozilmaydi.
+- Krediti yo'q OpenAI ovozi har soatda qayta sinalayotgan edi: endi 6 soat dam oladi.
+- Telegram'ga yuborishda tarmoq bir zum uzilsa ("fetch failed" eslatmada), 2 soniyadan keyin bir marta qayta urinadi.
+
 ## Mini Appni o'z kompyuteringizda ochish
 Telegram Mini Appni faqat https manzildan ochadi. Kompyuterda bepul Cloudflare tunnel shu manzilni beradi:
 1. Bir marta o'rnating: `winget install --id Cloudflare.cloudflared` (terminalni yopib qayta oching).
