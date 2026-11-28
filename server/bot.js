@@ -97,7 +97,7 @@ Keling, inglizcha xuddi do'stlardek bemalol gaplashamiz. Xato qilsangiz, o'zbekc
 Pastdagi tugmani bosing yoki shu yerga ovozli xabar yuboring.`,
     { reply_markup: appKeyboard() });
 }
-const dueWords = (st) => (st.words || []).filter((w) => (w.due || '') <= S.today() && (w.box || 0) < 6);
+const dueWords = (st) => (st.words || []).filter((w) => (w.due || '') <= S.today());
 async function cmdStats(msg, user) {
   const st = db.getState(user.id), q = S.quota(user), t = S.today();
   const total = Math.floor(Object.values(st.days || {}).reduce((a, b) => a + b, 0) / 60000);

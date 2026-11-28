@@ -5,7 +5,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const STEPS = [0, 1, 2, 4, 7, 15, 30];
+/* a learned word (top box) comes back every week, so nothing is forgotten */
+const STEPS = [0, 1, 2, 3, 5, 7, 7];
 const tday = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(d || new Date());
 const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return tday(d); };
 
@@ -27,7 +28,7 @@ function grade(w, ok) {
   w.seen = (w.seen || 0) + 1; w.t = Date.now();
   return w;
 }
-const isDue = (w) => (w.due || '') <= tday() && (w.box || 0) < STEPS.length - 1;
+const isDue = (w) => (w.due || '') <= tday();
 
 /* words for today's conversation: due first, then the ones still being learned; skip those already used today */
 function targets(words, n) {

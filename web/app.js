@@ -47,7 +47,7 @@ function uzr(t){
     all++; let r = pronWord(x); if (r) known++; else r = x.toLowerCase();
     return all > 1 && /^\s*$|[.!?]\s*$/.test(t.slice(0, at)) ? r.charAt(0).toUpperCase() + r.slice(1) : r;
   }).replace(/\s+/g, ' ').trim();
-  if (!known || (all === 1 && out.toLowerCase() === pClean(t.trim()))) return null;
+  if (!known) return null;
   return all > 1 ? out.charAt(0).toUpperCase() + out.slice(1) : out;
 }
 function pronFetch(){
@@ -679,7 +679,9 @@ document.addEventListener('keydown', e => {
 if (micBlocked) micOff(SERVER ? "Bu Telegram versiyasida mikrofon yo'q. Yozib gaplashing." : "Bu yerda ovoz tanish yo'q. Pastga yozib gaplashing.");
 
 /* ================= words: spaced repetition ================= */
-const STEPS = [0, 1, 2, 4, 7, 15, 30];   /* days until the next review, by box */
+/* days until the next review, by box. A learned word ("yodlandi") never leaves: it comes back once a week,
+   so nothing is forgotten; a miss sends it back to the start. */
+const STEPS = [0, 1, 2, 3, 5, 7, 7];
 const BOXNAME = ['yangi','1-bosqich','2-bosqich','3-bosqich','4-bosqich','5-bosqich','yodlandi'];
 const PACKS = {
   daily:  { uz:'Har kuni', items:"wake up|uyg'onmoq|I wake up at seven.;busy|band|I'm busy today.;tired|charchagan|I'm so tired!;in a hurry|shoshilib|Sorry, I'm in a hurry.;usually|odatda|I usually walk to work.;weekend|dam olish kunlari|What did you do at the weekend?;neighbour|qo'shni|My neighbour is very kind.;chores|uy ishlari|I do the chores on Sunday.;take a nap|bir oz uxlab olmoq|I take a nap after lunch.;on my way|yo'ldaman|I'm on my way!" },
@@ -729,10 +731,14 @@ function addWords(list, src, max){
   if (added.length){ LS.set('words', words); renderBadge(); }
   return added;
 }
-const due = () => words.filter(w => w.due <= today() && w.box < STEPS.length - 1);
+const due = () => words.filter(w => w.due <= today());
+const weekly = w => w.box >= STEPS.length - 1;
+/* reviews planned under the old, longer steps (15 and 30 days) come no later than a week from now */
+function capDue(){ const lim = addDays(7); let n = 0; words.forEach(w => { if (w.due > lim){ w.due = lim; n++; } }); if (n) LS.set('words', words); }
+capDue();
 function grade(w, ok){
   /* ok: true (bilaman), false (eslay olmadim), 'hard' (qiyin: same step, sooner), 'known' (already knew it) */
-  if (ok === 'known'){ w.box = 5; w.due = addDays(30); }
+  if (ok === 'known'){ w.box = STEPS.length - 1; w.due = addDays(7); }
   else if (ok === 'hard'){ w.box = Math.max(1, w.box); w.due = addDays(Math.max(1, Math.floor(STEPS[w.box] / 2))); }
   else if (ok){ w.box = Math.min(STEPS.length - 1, w.box + 1); w.due = addDays(STEPS[w.box]); }
   else { w.box = Math.min(w.box, 1); w.due = today(); }
@@ -744,7 +750,8 @@ function renderPractice(){
   const box = $('practice'); box.innerHTML = '';
   if (wmode === 'mistakes'){ $('wSub').textContent = `${mistakes.length} ta xato · ${mistakes.filter(m => (m.ok||0) >= 2).length} tasi o'zlashtirildi`; return renderMistakes(box); }
   if (wmode !== 'voice') coreDaily();
-  $('wSub').textContent = `${due().length} ta takrorlash · ${words.filter(w => w.box >= 4).length} ta yodlangan`;
+  const wk = due().filter(weekly).length;
+  $('wSub').textContent = `${due().length} ta takrorlash` + (wk ? ` (shundan ${wk} tasi haftalik takror)` : '') + ` · ${words.filter(w => w.box >= 4).length} ta yodlangan`;
   if (!words.length){
     const d = el('div','done'); d.append(el('div','big',"Keling, so'z yig'amiz!"), el('div','note',"Pastdan to'plam tanlang yoki hamrohingiz bilan gaplashing: suhbatdagi yangi so'zlar shu yerga o'zi tushadi.")); box.append(d); return;
   }
@@ -766,7 +773,7 @@ function renderCard(box){
   let flipped = false;
   const deck = el('div','deck'), card = el('div','card'); card.tabIndex = 0; card.setAttribute('role','button'); card.setAttribute('aria-label','Kartochkani aylantirish');
   const front = el('div','face'), back = el('div','face back');
-  front.append(el('div','box', BOXNAME[cur.box] || ''), el('div','big', cur.w), rdEl(cur.w, 'rd rdbig'));
+  front.append(el('div','box', weekly(cur) ? '🔁 Haftalik takror · yodlangan so\'z' : BOXNAME[cur.box] || ''), el('div','big', cur.w), rdEl(cur.w, 'rd rdbig'));
   if (cur.sound) front.append(el('div','sound', '[' + cur.sound + ']'));
   front.append(el('div','hint',"Bosing va tarjimasini ko'ring"));
   back.append(el('div','big', cur.w), rdEl(cur.w), el('div','uz', cur.uz));
@@ -1289,7 +1296,7 @@ async function initTelegram(){
   try {
     const r = await api('/api/me'); const j = await r.json(); quota = j.quota; renderQuota(); renderRemind(j.remind || []); serverVoice = j.voice !== false; syncBase = +j.now || Date.now(); synced = true; if (j.admin) initAdmin();
     const s = j.state || {};
-    if (s.flu) flu = s.flu; if (Array.isArray(s.tests)) tests = s.tests; if (s.story) story = s.story; if (s.lesson) lesson = s.lesson; if (s.speak) spState = Object.assign({ done: [], role: null }, s.speak); if (s.mistakes) mistakes = s.mistakes; if (s.words) words = s.words; if (s.days) days = s.days; if (s.chat) chat = s.chat; if (s.settings){ Object.assign(settings, s.settings); applyCalm(); $('corrections').value = settings.corrections; $('ansLang').value = settings.lang || 'both'; $('about').value = settings.about || ''; $('gender').value = settings.gender || 'auto'; $('calm').checked = settings.calm === false; settings.char = Object.assign({ id:'nur', color:'', acc:'none', name:'' }, settings.char || {}); if (!P.pick(P.STYLES, settings.style)) settings.style = 'samimiy'; if (!P.pick(P.TOPICS, settings.topic)) settings.topic = 'free'; topic = settings.topic; paintChar(); CH.paint($('avatarSvg'), settings.char, true); }
+    if (s.flu) flu = s.flu; if (Array.isArray(s.tests)) tests = s.tests; if (s.story) story = s.story; if (s.lesson) lesson = s.lesson; if (s.speak) spState = Object.assign({ done: [], role: null }, s.speak); if (s.mistakes) mistakes = s.mistakes; if (s.words){ words = s.words; capDue(); } if (s.days) days = s.days; if (s.chat) chat = s.chat; if (s.settings){ Object.assign(settings, s.settings); applyCalm(); $('corrections').value = settings.corrections; $('ansLang').value = settings.lang || 'both'; $('about').value = settings.about || ''; $('gender').value = settings.gender || 'auto'; $('calm').checked = settings.calm === false; settings.char = Object.assign({ id:'nur', color:'', acc:'none', name:'' }, settings.char || {}); if (!P.pick(P.STYLES, settings.style)) settings.style = 'samimiy'; if (!P.pick(P.TOPICS, settings.topic)) settings.topic = 'free'; topic = settings.topic; paintChar(); CH.paint($('avatarSvg'), settings.char, true); }
     SYNC_KEYS.forEach(k => { if (s[k] != null) try { localStorage.setItem('qumri_'+k, JSON.stringify(s[k])); } catch(e){} });
     $('level').value = settings.level; $('goal').value = String(settings.goal); $('rate').value = String(settings.rate);
     renderGoal(); renderBadge(); renderTopics(); startTalk(false); setTimeout(testNudge, 1200);

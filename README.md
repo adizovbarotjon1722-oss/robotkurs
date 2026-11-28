@@ -176,6 +176,11 @@ Pastki menyuda to'rtinchi bo'lim: **Ertak·Qo'shiq** (botda `/ertak`). Hammasi A
 - **Pullik AI ulash**: Mini App → Sozlamalar → "AI kalitlari" (faqat egasi ko'radi) → Claude (`ANTHROPIC_API_KEY`) yoki OpenAI (`OPENAI_API_KEY`) kalitini kiriting. Kalit darhol tekshiriladi va ishlasa, navbatda birinchi turadi (bepullar zaxiraga o'tadi). Model: `CLAUDE_MODEL` (standart `claude-haiku-5-5`), `OPENAI_CHAT_MODEL`. O'chirish: `AI_PREFER_PAID=0`.
 - OpenAI'da kredit bo'lsa, botning ovozli javoblari ham ishlaydi.
 
+## 🔁 Yodlangan so'zlar unutilmaydi (2026-11-28)
+- Takrorlash oraliqlari: 0, 1, 2, 3, 5, 7 kun. "Yodlandi" bosqichidagi so'z endi ro'yxatdan chiqmaydi: har 7 kunda "🔁 Haftalik takror" bo'lib qaytadi. Esdan chiqsa, boshidan o'rganiladi.
+- Avvalgi 15 va 30 kunlik rejalar 7 kunga qisqartirildi. Bot testlari va eslatmalari ham shu qoidaga amal qiladi.
+- 3000 so'z kursi va 109 gap qolipining hammasi tekshirildi: har biriga o'zbekcha o'qilishi bor. Inglizcha yozilishi bilan bir xil bo'lsa ham ko'rsatiladi (trip → trip). Britancha yozuvlar (jewellery, flavour, analyse…) uchun ham o'qilish qo'shildi.
+
 ## 🤖 Ko'proq bepul AI va uzluksiz suhbat (2026-11-28)
 Yangi bepul AI'lar (kalitni Mini App → Sozlamalar → "AI kalitlari" ga yoki Railway Variables'ga qo'yasiz):
 
