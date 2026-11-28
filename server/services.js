@@ -62,18 +62,23 @@ async function claude(messages, max) {
 }
 
 /* Free option: Google Gemini (aistudio.google.com). Same prompts; roles map to user/model. */
+/* each Gemini model has its own free daily limit: when one is used up, the next model answers */
+const GEMINI_MODELS = () => [...new Set([C.geminiModel, 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemma-3-27b-it'])];
 async function gemini(messages, max) {
   if (!C.geminiKey) throw new ApiError('not_configured', 503);
+  return rotate('gemini', GEMINI_MODELS(), (model) => gemini1(model, messages, max));
+}
+async function gemini1(model, messages, max) {
   const contents = messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content) }] }));
-  const r = await withTimeout('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(C.geminiModel) + ':generateContent', {
+  const r = await withTimeout('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
     method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': C.geminiKey },
     /* extra room: newer Gemini models spend part of the budget on thinking */
-    body: JSON.stringify({ contents, generationConfig: { maxOutputTokens: Math.max(1024, Math.min((max || 800) * 3, 8192)), responseMimeType: 'application/json', temperature: 0.8 } })
+    body: JSON.stringify({ contents, generationConfig: Object.assign({ maxOutputTokens: Math.max(1024, Math.min((max || 800) * 3, 8192)), temperature: 0.8 }, /gemma/.test(model) ? {} : { responseMimeType: 'application/json' }) })
   }, tmo(max));
   if (!r.ok) {
     let why = ''; try { const e = await r.json(); why = (e.error && (e.error.status + ': ' + e.error.message)) || ''; } catch (x) {}
     if (!quietChecks) console.error('gemini', r.status, why.slice(0, 300));
-    const err = new ApiError(r.status === 429 ? 'rate_limited' : 'upstream', r.status === 429 ? 429 : 502); err.http = r.status; err.why = why; throw err;
+    const err = new ApiError(r.status === 429 ? 'rate_limited' : 'upstream', r.status === 429 ? 429 : 502); err.http = r.status; err.why = why; err.model = model; throw err;
   }
   const j = await r.json();
   const parts = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
@@ -100,7 +105,7 @@ async function openaiLike(name, url, key, model, messages, max, json) {
     let why = ''; try { const e = await r.json(); why = (e.error && (e.error.message || e.error)) || e.message || ''; } catch (x) {}
     if (!quietChecks) console.error(name, r.status, String(why).slice(0, 300));
     const err = new ApiError(r.status === 429 ? 'rate_limited' : 'upstream', r.status === 429 ? 429 : 502);
-    err.http = r.status; err.why = String(why); throw err;
+    err.http = r.status; err.why = String(why); err.retry = r.headers.get('retry-after') || ''; err.model = model; throw err;
   }
   const j = await r.json();
   return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
@@ -116,8 +121,23 @@ const COMPAT = {
   openrouter: { label: 'OpenRouter', base: 'https://openrouter.ai/api/v1', key: 'OPENROUTER_API_KEY', model: 'OPENROUTER_MODEL', json: false, freeOnly: true,
     prefer: ['meta-llama/llama-3.3-70b-instruct:free', 'openai/gpt-oss-120b:free', 'deepseek/deepseek-chat-v3-0324:free', 'google/gemma-3-27b-it:free', 'qwen/qwen3-235b-a22b:free', 'mistralai/mistral-small-3.2-24b-instruct:free'] },
   mistral: { label: 'Mistral', base: 'https://api.mistral.ai/v1', key: 'MISTRAL_API_KEY', model: 'MISTRAL_MODEL',
-    prefer: ['mistral-small-latest', 'mistral-medium-latest', 'open-mistral-nemo', 'ministral-8b-latest'] }
+    prefer: ['mistral-medium-latest', 'mistral-small-latest', 'open-mistral-nemo', 'ministral-8b-latest'] },
+  /* GitHub Models: free with a GitHub token (models:read); each model has its own daily limit */
+  github: { label: 'GitHub Models', base: 'https://models.github.ai/inference', key: 'GITHUB_MODELS_TOKEN', model: 'GITHUB_MODEL', noList: true,
+    prefer: ['openai/gpt-4.1', 'openai/gpt-4o', 'deepseek/DeepSeek-V3-0324', 'meta/Llama-3.3-70B-Instruct', 'openai/gpt-4.1-mini', 'openai/gpt-4o-mini'] },
+  sambanova: { label: 'SambaNova', base: 'https://api.sambanova.ai/v1', key: 'SAMBANOVA_API_KEY', model: 'SAMBANOVA_MODEL',
+    prefer: ['DeepSeek-V3.1', 'DeepSeek-V3-0324', 'Meta-Llama-3.3-70B-Instruct', 'gpt-oss-120b', 'Llama-4-Maverick-17B-128E-Instruct', 'Qwen3-32B'] },
+  nvidia: { label: 'NVIDIA', base: 'https://integrate.api.nvidia.com/v1', key: 'NVIDIA_API_KEY', model: 'NVIDIA_MODEL',
+    prefer: ['deepseek-ai/deepseek-v3.1', 'meta/llama-3.3-70b-instruct', 'openai/gpt-oss-120b', 'qwen/qwen3-235b-a22b', 'meta/llama-4-maverick-17b-128e-instruct', 'mistralai/mistral-medium-3-instruct'] },
+  /* Cloudflare Workers AI: the key is written as ACCOUNT_ID:API_TOKEN */
+  cloudflare: { label: 'Cloudflare', base: (k) => 'https://api.cloudflare.com/client/v4/accounts/' + encodeURIComponent(String(k).split(':')[0]) + '/ai/v1', token: (k) => String(k).split(':').slice(1).join(':'),
+    key: 'CLOUDFLARE_AI_KEY', model: 'CLOUDFLARE_MODEL', noList: true, json: false,
+    prefer: ['@cf/openai/gpt-oss-120b', '@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-4-scout-17b-16e-instruct', '@cf/mistralai/mistral-small-3.1-24b-instruct'] },
+  cohere: { label: 'Cohere', base: 'https://api.cohere.ai/compatibility/v1', key: 'COHERE_API_KEY', model: 'COHERE_MODEL', noList: true, json: false,
+    prefer: ['command-a-03-2025', 'command-r-plus-08-2024', 'command-r-08-2024'] }
 };
+const baseOf = (p) => (typeof p.base === 'function' ? p.base(process.env[p.key]) : p.base);
+const tokenOf = (p) => (p.token ? p.token(process.env[p.key]) : process.env[p.key]);
 const SKIP_MODEL = /whisper|guard|tts|orpheus|playai|compound|distil|embed|moderation|ocr|vision|audio|image|transcri|codestral|pixtral/i;
 const picked = {};
 /* when none of the known good models is there, take the biggest one (a 1.7B model is too weak for teaching) */
@@ -127,29 +147,83 @@ function bestBySize(ids) {
   const size = (x) => { const m = x.match(/(\d+(?:\.\d+)?)b\b/i); return m ? +m[1] : 0; };
   return ids.slice().sort((a, b) => size(b) - size(a))[0];
 }
+const avail = {}; /* good models this key can use, best first (the first one is the main model) */
 async function pickModel(id, refresh) {
   const p = COMPAT[id], fixed = process.env[p.model];
-  if (fixed && !refresh) return fixed;
+  if (fixed && !refresh) { avail[id] = [fixed].concat(p.prefer.filter((m) => m !== fixed)); return fixed; }
   if (picked[id] && !refresh) return picked[id];
+  if (p.noList) { avail[id] = (avail[id] && refresh ? avail[id].slice(1) : p.prefer.slice()); if (!avail[id].length) avail[id] = p.prefer.slice(); picked[id] = avail[id][0]; console.log(id + ' model:', picked[id]); return picked[id]; }
   try {
-    const r = await withTimeout(p.base + '/models', { headers: { authorization: 'Bearer ' + process.env[p.key] } }, 15000);
+    const r = await withTimeout(baseOf(p) + '/models', { headers: { authorization: 'Bearer ' + tokenOf(p) } }, 15000);
     let ids = ((await r.json()).data || []).filter((m) => m && m.active !== false).map((m) => m.id);
     if (p.freeOnly) ids = ids.filter((m) => /:free$/.test(m));
-    picked[id] = p.prefer.find((m) => ids.includes(m)) || bestBySize(ids.filter((m) => !SKIP_MODEL.test(m))) || p.prefer[0];
-  } catch (e) { picked[id] = picked[id] || p.prefer[0]; }
+    const good = p.prefer.filter((m) => ids.includes(m));
+    picked[id] = good[0] || bestBySize(ids.filter((m) => !SKIP_MODEL.test(m))) || p.prefer[0];
+    avail[id] = [picked[id]].concat(good.filter((m) => m !== picked[id]));
+  } catch (e) { picked[id] = picked[id] || p.prefer[0]; avail[id] = avail[id] || p.prefer.slice(); }
   console.log(id + ' model:', picked[id]);
   return picked[id];
 }
-const NO_EFFORT = new Set();
-async function compatChat(id, m, x) {
-  const p = COMPAT[id], key = process.env[p.key], url = p.base + '/chat/completions';
-  try { return await openaiLike(id, url, key, await pickModel(id), m, x, p.json); }
-  catch (e) {
-    if (e.http === 404 || (e.http === 400 && /model/i.test(e.why))) { delete process.env[p.model]; return openaiLike(id, url, key, await pickModel(id, true), m, x, p.json); }
-    if (e.http === 400 && p.json !== false && /json|response_format/i.test(e.why)) return openaiLike(id, url, key, await pickModel(id), m, x, false);
-    if (e.http === 400 && /reasoning_effort/i.test(e.why)) { NO_EFFORT.add(id); return openaiLike(id, url, key, await pickModel(id), m, x, p.json); }
-    throw e;
+/* ---------- limits: when a model hits its limit it rests until the time the service names,
+   the next model of the same service answers, and only then the next service ---------- */
+const modelRest = new Map(); /* 'service|model' -> time it may be used again */
+function retryMs(e) {
+  const w = String(e.why || '');
+  const h = Number(e.retry); if (h > 0) return h * 1000;
+  const m = w.match(/(?:try again|retry) in\s*(?:(\d+)h)?\s*(?:(\d+)m(?!s))?\s*(?:([\d.]+)s)?/i);
+  if (m && (m[1] || m[2] || m[3])) return ((+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0)) * 1000 + 2000;
+  const d = w.match(/retryDelay"?:\s*"?(\d+)s/); if (d) return +d[1] * 1000 + 2000;
+  return 0;
+}
+/* how long a failed AI (or model) should rest */
+function restMs(e) {
+  const w = String(e.why || '');
+  if (e.http === 401 || e.http === 403 || e.http === 402 || /credit|billing|balance|insufficient/i.test(w)) return 30 * 60000;
+  const hint = retryMs(e);
+  if (/per day|daily|RPD|tokens per day|requests per day|PerDay/i.test(w)) return Math.max(hint, 60 * 60000);
+  if (hint) return Math.min(Math.max(hint, 15000), 6 * 3600000);
+  if (/quota|exhausted/i.test(w)) return 20 * 60000;
+  return e.code === 'rate_limited' ? 2 * 60000 : e.http >= 500 ? 60000 : 2 * 60000;
+}
+const restingModel = (svc, m) => modelRest.get(svc + '|' + m) > Date.now();
+/* try the models of one service in order; a model at its limit rests and the next one answers */
+async function rotate(svc, models, run) {
+  let last, tried = 0;
+  for (const m of models) {
+    if (restingModel(svc, m)) continue;
+    if (tried++ >= 3) break;
+    try { const t = await run(m); modelRest.delete(svc + '|' + m); return t; }
+    catch (e) {
+      last = e;
+      if (e.code === 'not_configured') throw e;
+      const gone = e.http === 404 || (e.http === 400 && /(model|deployment).{0,40}(not found|does not exist|decommissioned|not supported|unknown|unavailable)|(invalid|unknown) model/i.test(e.why || ''));
+      if (e.code === 'rate_limited' || e.http === 503 || gone) {
+        modelRest.set(svc + '|' + m, Date.now() + (gone ? 24 * 3600000 : restMs(e)));
+        if (!quietChecks) console.log(svc + ': ' + m + (e.http === 429 ? ' limitga urildi' : ' ishlamadi') + ", shu xizmatning boshqa modeliga o'tyapman");
+        continue;
+      }
+      throw e; /* key, credit or network problems are the whole service's, not one model's */
+    }
   }
+  if (last) throw last;
+  const e = new ApiError('rate_limited', 429); e.http = 429; e.why = 'all models resting'; e.retry = String(Math.max(15, Math.round((Math.min(...models.map((m) => modelRest.get(svc + '|' + m) || Infinity)) - Date.now()) / 1000))); throw e;
+}
+const NO_EFFORT = new Set();
+const NO_JSON = new Set();
+async function compatChat(id, m, x) {
+  const p = COMPAT[id], key = process.env[p.key];
+  if (!key) throw new ApiError('not_configured', 503);
+  const url = baseOf(p) + '/chat/completions', tok = tokenOf(p);
+  await pickModel(id);
+  return rotate(id, avail[id] && avail[id].length ? avail[id] : [picked[id]], async (model) => {
+    const json = p.json === false || NO_JSON.has(id + '|' + model) ? false : undefined;
+    try { return await openaiLike(id, url, tok, model, m, x, json); }
+    catch (e) {
+      if (e.http === 400 && json !== false && /json|response_format/i.test(e.why)) { NO_JSON.add(id + '|' + model); return openaiLike(id, url, tok, model, m, x, false); }
+      if (e.http === 400 && /reasoning_effort/i.test(e.why)) { NO_EFFORT.add(id); return openaiLike(id, url, tok, model, m, x, json); }
+      throw e;
+    }
+  });
 }
 
 /* Every configured AI, in order. AI_PROVIDER (or AI_ORDER=gemini,groq,anthropic) puts one first.
@@ -161,16 +235,24 @@ const ENGINES = {
   cerebras: { key: () => process.env.CEREBRAS_API_KEY, run: (m, x) => compatChat('cerebras', m, x), label: 'Cerebras' },
   openrouter: { key: () => process.env.OPENROUTER_API_KEY, run: (m, x) => compatChat('openrouter', m, x), label: 'OpenRouter' },
   mistral: { key: () => process.env.MISTRAL_API_KEY, run: (m, x) => compatChat('mistral', m, x), label: 'Mistral' },
+  github: { key: () => process.env.GITHUB_MODELS_TOKEN, run: (m, x) => compatChat('github', m, x), label: 'GitHub Models' },
+  sambanova: { key: () => process.env.SAMBANOVA_API_KEY, run: (m, x) => compatChat('sambanova', m, x), label: 'SambaNova' },
+  nvidia: { key: () => process.env.NVIDIA_API_KEY, run: (m, x) => compatChat('nvidia', m, x), label: 'NVIDIA' },
+  cloudflare: { key: () => (/^[0-9a-f]{32}:/i.test(process.env.CLOUDFLARE_AI_KEY || '') ? process.env.CLOUDFLARE_AI_KEY : ''), run: (m, x) => compatChat('cloudflare', m, x), label: 'Cloudflare' },
+  cohere: { key: () => process.env.COHERE_API_KEY, run: (m, x) => compatChat('cohere', m, x), label: 'Cohere' },
   openai: { key: () => C.openaiKey, run: (m, x) => openaiLike('openai', 'https://api.openai.com/v1/chat/completions', C.openaiKey, C.openaiChatModel, m, x), label: 'OpenAI' }
 };
 const PAID = ['anthropic', 'openai'];
-const DEFAULT_ORDER = ['anthropic', 'gemini', 'groq', 'cerebras', 'mistral', 'openrouter', 'openai'];
+const DEFAULT_ORDER = ['anthropic', 'openai', 'github', 'gemini', 'groq', 'sambanova', 'cerebras', 'nvidia', 'mistral', 'cohere', 'openrouter', 'cloudflare'];
+/* how good a teacher each one is (1 best). The order is quality first, then speed:
+   a strong model that answers in 3 s beats a weak one that answers in 0.5 s, but not one that takes 15 s. */
+const TIER = { anthropic: 1, openai: 1, github: 2, gemini: 2, groq: 2, sambanova: 2, cerebras: 2, nvidia: 2, mistral: 3, cohere: 3, openrouter: 3, cloudflare: 3 };
 const speed = {}; /* seconds each AI took in the start-up test; failed ones are missing */
 function order() {
   if (!process.env.AI_ORDER && Object.keys(speed).length) {
     /* fastest working AI first; AI_PROVIDER stays first only if it works and answers within 8 s */
     const fav = String(process.env.AI_PROVIDER || '').toLowerCase();
-    const ok = Object.keys(speed).filter((s) => ENGINES[s].key()).sort((a, b) => speed[a] - speed[b]);
+    const ok = Object.keys(speed).filter((s) => ENGINES[s].key()).sort((a, b) => ((TIER[a] || 3) * 8 + Math.min(speed[a], 30)) - ((TIER[b] || 3) * 8 + Math.min(speed[b], 30)));
     /* a paid AI (Claude, OpenAI) that works goes first: better teaching beats a second of speed.
        AI_PREFER_PAID=0 turns this off. */
     if (process.env.AI_PREFER_PAID !== '0') PAID.slice().reverse().forEach((p) => { if (ok.includes(p) && speed[p] <= 20) ok.splice(ok.indexOf(p), 1), ok.unshift(p); });
@@ -203,8 +285,9 @@ async function complete(messages, max) {
         if (e.code === 'not_configured') continue;
         console.error('AI', name, 'ishlamadi:', e.code || e.name || '', e.code ? '' : String(e.message).slice(0, 200), "-> keyingisiga o'tyapman");
         /* no credit or bad key: rest long; a rate limit or network error: rest a little */
-        const hard = e.http === 401 || e.http === 403 || e.http === 402 || /credit|billing|quota/i.test(e.why || '');
-        resting.set(name, Date.now() + (hard ? 30 : 2) * 60000);
+        const ms = restMs(e);
+        resting.set(name, Date.now() + ms);
+        if (ms >= 5 * 60000) console.log('AI ' + name + ': ' + Math.round(ms / 60000) + " daqiqa dam oladi, keyin o'zi qaytadi");
       }
     }
     if (round === 1) await new Promise((r) => setTimeout(r, 1500));
@@ -288,6 +371,19 @@ async function runAI(user, type, payload) {
   inflight.set(key, p); return p;
 }
 /* type + data in, text out. The prompt is always built here from a whitelist. */
+const OFFLINE_Q = [
+  ['What did you do today?', 'Bugun nima qildingiz?'], ['What are you working on this week?', 'Bu hafta nima ustida ishlayapsiz?'],
+  ['Tell me about your city.', 'Shahringiz haqida gapirib bering.'], ['What was the best part of your day?', "Kuningizning eng yaxshi qismi nima bo'ldi?"],
+  ['Where would you like to travel next?', 'Keyingi safar qayerga borishni xohlaysiz?'], ['What do you usually eat for breakfast?', 'Nonushtaga odatda nima yeysiz?'],
+  ['What was the last problem you solved at work?', 'Ishda oxirgi marta qanday muammoni hal qildingiz?'], ['What are your plans for the weekend?', 'Dam olish kunlariga rejangiz qanday?'],
+  ['Describe your workplace.', 'Ish joyingizni tasvirlab bering.'], ['What do you do to relax?', "Dam olish uchun nima qilasiz?"]
+];
+function offlineTurn(payload) {
+  const turns = (payload && Array.isArray(payload.turns)) ? payload.turns : [];
+  const asked = turns.filter((t) => t && t.role === 'assistant').map((t) => String(t.content));
+  const q = OFFLINE_Q.find(([en]) => !asked.some((a) => a.includes(en))) || OFFLINE_Q[turns.length % OFFLINE_Q.length];
+  return { emotion: 'gentle', reply: 'I see. Let me ask you something else: ' + q[0], reply_uz: "Tushundim. Keling, boshqa narsa so'rayman: " + q[1] + " (AI'lar bir daqiqa dam olyapti, shuning uchun bu safar xatolarni tekshirmadim.)", tips: [], ideas: [] };
+}
 async function runAI1(user, type, payload) {
   if (!prompts.TYPES.includes(type)) throw new ApiError('bad_type');
   const q = quota(user);
@@ -298,7 +394,12 @@ async function runAI1(user, type, payload) {
   let text;
   await slot();
   try { text = await complete(b.messages, b.max); }
-  catch (e) { console.log('AI: ' + type + ' ✗ hech bir AI javob bermadi (' + (e.code || e.message) + ')'); throw e; }
+  catch (e) {
+    console.log('AI: ' + type + ' ✗ hech bir AI javob bermadi (' + (e.code || e.message) + ')');
+    /* the conversation never stops: while every AI rests, a simple question keeps the learner talking */
+    if (type === 'chat') { return { text: JSON.stringify(offlineTurn(payload)), quota: quota(user), offline: true }; }
+    throw e;
+  }
   finally { release(); }
   console.log('AI: ' + type + ' ✓ ' + lastEngine + ' ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
   db.addUsage(user.id, today(), 1, 0, 0);
@@ -504,6 +605,11 @@ const KEY_DEFS = [
   { id: 'CEREBRAS_API_KEY', label: 'Cerebras', engine: 'cerebras', site: 'cloud.cerebras.ai' },
   { id: 'MISTRAL_API_KEY', label: 'Mistral', engine: 'mistral', site: 'console.mistral.ai' },
   { id: 'OPENROUTER_API_KEY', label: 'OpenRouter', engine: 'openrouter', site: 'openrouter.ai' },
+  { id: 'GITHUB_MODELS_TOKEN', label: 'GitHub Models', engine: 'github', site: 'github.com/settings/tokens', note: "GPT-4.1 va DeepSeek bepul: Fine-grained token, ruxsat Models: Read" },
+  { id: 'SAMBANOVA_API_KEY', label: 'SambaNova', engine: 'sambanova', site: 'cloud.sambanova.ai', note: 'DeepSeek V3, Llama 70B: bepul va tez' },
+  { id: 'NVIDIA_API_KEY', label: 'NVIDIA', engine: 'nvidia', site: 'build.nvidia.com', note: 'DeepSeek, Llama, Qwen: bepul (daqiqasiga 40 ta so\'rov)' },
+  { id: 'CLOUDFLARE_AI_KEY', label: 'Cloudflare', engine: 'cloudflare', site: 'dash.cloudflare.com', note: "Shunday yozing: ACCOUNT_ID:API_TOKEN (kuniga 10 000 neyron bepul)" },
+  { id: 'COHERE_API_KEY', label: 'Cohere', engine: 'cohere', site: 'dashboard.cohere.com', note: 'Trial kalit: oyiga 1000 so\'rov bepul' },
   { id: 'OPENAI_API_KEY', label: 'OpenAI', engine: 'openai', site: 'platform.openai.com', paid: true, note: 'eng tabiiy ovoz' }
 ];
 const ENV0 = {}; KEY_DEFS.forEach((k) => { ENV0[k.id] = process.env[k.id] || ''; });
@@ -532,7 +638,7 @@ const mask = (v) => (v ? '••••' + v.slice(-4) : '');
 function keyList() {
   return KEY_DEFS.map((k) => ({ id: k.id, label: k.label, site: k.site, paid: !!k.paid, note: k.note || '',
     source: SAVED[k.id] ? 'app' : ENV0[k.id] ? 'env' : '', masked: mask(SAVED[k.id] || ENV0[k.id]),
-    resting: !!(resting.get(k.engine) > Date.now()) }));
+    resting: !!(resting.get(k.engine) > Date.now()), until: resting.get(k.engine) > Date.now() ? resting.get(k.engine) : 0 }));
 }
 function setKey(id, value) {
   const def = KEY_DEFS.find((k) => k.id === id); if (!def) throw new ApiError('bad_key_id');
@@ -541,7 +647,8 @@ function setKey(id, value) {
   if (v) { SAVED[id] = v; db.kvSet('key:' + id, seal(v)); } else { delete SAVED[id]; db.kvDel('key:' + id); }
   applyKeys();
   /* forget everything learned about the old key */
-  resting.delete(def.engine); delete speed[def.engine]; delete picked[def.engine];
+  resting.delete(def.engine); delete speed[def.engine]; delete picked[def.engine]; delete avail[def.engine];
+  [...modelRest.keys()].forEach((k) => { if (k.startsWith(def.engine + '|')) modelRest.delete(k); });
   if (id === 'GROQ_API_KEY') { groqTtsModel = ''; delete freeDown.groq; }
   if (id === 'GEMINI_API_KEY') { geminiTtsModel = ''; delete freeDown.gemini; }
   if (id === 'OPENAI_API_KEY') voiceOffUntil = 0;

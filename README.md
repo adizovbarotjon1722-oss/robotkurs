@@ -176,6 +176,25 @@ Pastki menyuda to'rtinchi bo'lim: **Ertak·Qo'shiq** (botda `/ertak`). Hammasi A
 - **Pullik AI ulash**: Mini App → Sozlamalar → "AI kalitlari" (faqat egasi ko'radi) → Claude (`ANTHROPIC_API_KEY`) yoki OpenAI (`OPENAI_API_KEY`) kalitini kiriting. Kalit darhol tekshiriladi va ishlasa, navbatda birinchi turadi (bepullar zaxiraga o'tadi). Model: `CLAUDE_MODEL` (standart `claude-haiku-5-5`), `OPENAI_CHAT_MODEL`. O'chirish: `AI_PREFER_PAID=0`.
 - OpenAI'da kredit bo'lsa, botning ovozli javoblari ham ishlaydi.
 
+## 🤖 Ko'proq bepul AI va uzluksiz suhbat (2026-11-28)
+Yangi bepul AI'lar (kalitni Mini App → Sozlamalar → "AI kalitlari" ga yoki Railway Variables'ga qo'yasiz):
+
+| AI | Kalit nomi | Qayerdan | Nimasi yaxshi |
+|---|---|---|---|
+| GitHub Models | `GITHUB_MODELS_TOKEN` | github.com/settings/tokens → Fine-grained token, ruxsat: Models (Read) | GPT-4.1, GPT-4o, DeepSeek V3 bepul (kunlik limit bilan) |
+| SambaNova | `SAMBANOVA_API_KEY` | cloud.sambanova.ai | DeepSeek V3, Llama 70B, juda tez |
+| NVIDIA | `NVIDIA_API_KEY` | build.nvidia.com | DeepSeek, Llama, Qwen |
+| Cloudflare | `CLOUDFLARE_AI_KEY` = `ACCOUNT_ID:API_TOKEN` | dash.cloudflare.com → Workers AI | kuniga 10 000 neyron |
+| Cohere | `COHERE_API_KEY` | dashboard.cohere.com | oyiga 1000 so'rov |
+
+Avvalgilari ham ishlayveradi: Groq, Gemini, Cerebras, Mistral, OpenRouter. Claude (`ANTHROPIC_API_KEY`) va OpenAI pullik: kalit qo'yilib, ishlasa, avtomatik birinchi o'ringa chiqadi.
+
+Qanday ishlaydi:
+- Navbat: avval sifat (yaxshi o'qituvchi model), keyin tezlik.
+- Bitta model limitga ursa, o'sha xizmatning boshqa modeli javob beradi (masalan Gemini Flash → Flash-Lite → Gemma, GitHub GPT-4.1 → GPT-4o → DeepSeek). Hammasi tugasa, keyingi AI'ga o'tadi.
+- Limitga urgan model xizmat aytgan vaqtgacha dam oladi ("try again in 7m", Retry-After, kunlik limit bo'lsa 1 soat) va o'sha vaqtda o'zi qaytadi. "AI kalitlari" panelida qaysi AI qachongacha dam olayotgani ko'rinadi.
+- Hamma AI band bo'lsa ham suhbat to'xtamaydi: hamroh oddiy savol bilan davom etadi.
+
 ## 🚀 Tez gapirish: 300 ta eng kerakli ibora (2026-11-28)
 - Mashq bo'limida "🚀 Tez gapirish": 30 kun × 10 ta tayyor og'zaki ibora, eng kerakligidan boshlab: suhbatda qolib ketmaslik, tanishuv, kichik suhbat, ishda kundalik, yig'ilish, telefon, muammo haqida xabar, texnik tushuntirish, qurilish maydoni, hisobot, aeroport, mehmonxona, taksi, restoran, sog'liq va boshqalar.
 - Har kun: tinglash (inglizcha → o'zbekcha → inglizcha) → takrorlash (soya mashqi) → o'zbekchadan aytish → hamroh bilan shu mavzuda rolli suhbat.

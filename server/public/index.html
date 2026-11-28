@@ -5681,7 +5681,7 @@ function renderKeys(keys){
     const st = !k.masked ? '' : c ? c.status : k.resting ? 'rest' : '';
     const row = document.createElement('div'); row.className = 'krow';
     row.innerHTML = '<div class="kh"><span class="kdot ' + (st === 'ok' ? 'ok' : st === 'fail' ? 'fail' : st === 'rest' ? 'rest' : '') + '"></span>' + escH(k.label)
-      + ' <small>' + (k.masked ? escH(k.masked) + (k.source === 'app' ? ' · ilovada kiritilgan' : ' · server sozlamasidan') : "kalit yo'q") + (k.paid ? ' · pullik' : ' · bepul') + '</small></div>'
+      + ' <small>' + (k.masked ? escH(k.masked) + (k.source === 'app' ? ' · ilovada kiritilgan' : ' · server sozlamasidan') : "kalit yo'q") + (k.paid ? ' · pullik' : ' · bepul') + (k.until ? ' · ⏸ ' + new Date(k.until).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + ' gacha dam oladi' : '') + '</small></div>'
       + (k.note ? '<div class="note">' + escH(k.note) + '</div>' : '')
       + (c && c.status === 'fail' ? '<div class="note" style="color:var(--rose)">' + escH(c.why || 'ishlamadi') + '</div>' : '')
       + '<div class="kin"><input type="password" autocomplete="off" placeholder="Yangi kalit (' + escH(k.site) + ')"><button class="btn" data-a="save">Saqlash</button>'
