@@ -141,12 +141,40 @@ async function cmdRemind(msg, user) {
   const h = db.hours(user);
   await say(msg.chat.id, remindText(h), { reply_markup: remindKb(h) });
 }
+/* ---------- 🚀 Tez gapirish: the 300 ready-made phrases (same list as the Mini App) ---------- */
+const SPEAK = (() => { try { return require('../web/speak.js'); } catch (e) { console.error('speak.js not loaded:', e.message); return { days: [] }; } })();
+const spDone = (st) => (st.speak && Array.isArray(st.speak.done) ? st.speak.done : []);
+const spCur = (st) => { const d = spDone(st); for (let i = 0; i < SPEAK.days.length; i++) if (!d.includes(i)) return i; return 0; };
+/* the day the companion should nudge in the bot chat (only once the learner has started) */
+const spChat = (st) => (spDone(st).length || (st.speak && st.speak.started) ? spCur(st) : undefined);
+const spName = (user) => (/^[A-Za-z' -]{2,20}$/.test((user && user.first_name) || '') ? user.first_name : 'Alex');
+function speakText(d, user, st) {
+  const day = SPEAK.days[d]; if (!day) return '';
+  const lines = day.list.map((x, i) => { const [en, uz] = x.split('|').map((t) => t.replace('{name}', spName(user))); return `${i + 1}. <b>${esc(en)}</b>\n   🔤 <i>${esc(PRON.text(en))}</i>\n   <tg-spoiler>${esc(uz)}</tg-spoiler>`; });
+  return `🚀 <b>Tez gapirish · ${d + 1}-kun: ${esc(day.t)}</b> ${day.ic}\n${spDone(st).length}/${SPEAK.days.length} kun o'tildi\n\n` + lines.join('\n') + "\n\nHar birini ovoz chiqarib 3 marta ayting. Mini Appda: tinglash, takrorlash, tez tarjima va rolli suhbat.";
+}
+function speakKb(d) {
+  const nav = [];
+  if (d > 0) nav.push({ text: '◀ ' + d + '-kun', callback_data: 'sp:' + (d - 1) });
+  if (d < SPEAK.days.length - 1) nav.push({ text: (d + 2) + '-kun ▶', callback_data: 'sp:' + (d + 1) });
+  return { inline_keyboard: [[appBtn2('🚀 Mashq va rolli suhbat', 'speak')], nav] };
+}
+async function cmdSpeak(msg, user) {
+  const st = db.getState(user.id), d = spCur(st);
+  await say(msg.chat.id, speakText(d, user, st), { reply_markup: speakKb(d) });
+}
 async function onCallback(cq) {
   if (!cq.from || cq.from.is_bot) return;
   const user = db.touchUser(cq.from); if (user.banned) return;
   if (tooFast('c' + user.id, 40)) return tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Sekinroq 🙂' }).catch(() => {});
   const tm = String(cq.data || '').match(/^tt:(show|next)$/);
   if (tm && cq.message) return onTranslateCb(cq, user, tm[1]);
+  const spm = String(cq.data || '').match(/^sp:(\d{1,2})$/);
+  if (spm && cq.message) {
+    const d = Math.min(SPEAK.days.length - 1, +spm[1]), st = db.getState(user.id);
+    await tg('answerCallbackQuery', { callback_query_id: cq.id }).catch(() => {});
+    return tg('editMessageText', { chat_id: cq.message.chat.id, message_id: cq.message.message_id, text: speakText(d, user, st), parse_mode: 'HTML', reply_markup: speakKb(d) }).catch(() => {});
+  }
   const rm = String(cq.data || '').match(/^rv:([a-z0-9]{1,8}):(\d|x)$/);
   if (rm && cq.message) return onReview(cq, user, rm[1], rm[2]);
   const sm = String(cq.data || '').match(/^set:(lang|gender):(both|en|auto|female|male)$/);
@@ -193,7 +221,7 @@ async function cmdAbout(msg, user, arg) {
 }
 async function cmdSettings(msg, user) { await say(msg.chat.id, setText(), { reply_markup: setKb(db.getState(user.id).settings) }); }
 async function cmdHelp(msg) {
-  await say(msg.chat.id, "/start — boshlash\n/stats — natijalarim\n/words — bugun takrorlanadigan so'zlar\n/review — so'z yodlash (tugmali test, 5 ta savol)\n/dars — bugungi 10 daqiqalik dars\n/audio — o'rgangan so'zlaringizdan 2-3 daqiqalik dialog yoki hikoya\n/ertak — ertak va qo'shiqlar (darajangizga mos)\n/tarjima — tez tarjima mashqi\n/tinglash — 1 daqiqalik hikoya va savollar\n/premium — Premium (Telegram Stars)\n/remind — eslatma soatlari (bot o'zi savol yuboradi)\n/name — hamrohga ism berish\n/settings — javob tili (ikki tilda) va ovoz (ayol/erkak)\n/about — o'zingiz haqingizda (masalan: muhandisman), suhbat shunga moslashadi\n/report — haftalik hisobot (har yakshanba 20:00 da o'zim ham yuboraman)\n\nBotga ovozli yoki matnli xabar yuborsangiz ham, javob beraman. Ismimni yozsangiz yoki aytsangiz, \"Labbay!\" deyman.", { reply_markup: appKeyboard() });
+  await say(msg.chat.id, "/start — boshlash\n/ibora — 🚀 tez gapirish: bugungi 10 ta eng kerakli ibora\n/stats — natijalarim\n/words — bugun takrorlanadigan so'zlar\n/review — so'z yodlash (tugmali test, 5 ta savol)\n/dars — bugungi 10 daqiqalik dars\n/audio — o'rgangan so'zlaringizdan 2-3 daqiqalik dialog yoki hikoya\n/ertak — ertak va qo'shiqlar (darajangizga mos)\n/tarjima — tez tarjima mashqi\n/tinglash — 1 daqiqalik hikoya va savollar\n/premium — Premium (Telegram Stars)\n/remind — eslatma soatlari (bot o'zi savol yuboradi)\n/name — hamrohga ism berish\n/settings — javob tili (ikki tilda) va ovoz (ayol/erkak)\n/about — o'zingiz haqingizda (masalan: muhandisman), suhbat shunga moslashadi\n/report — haftalik hisobot (har yakshanba 20:00 da o'zim ham yuboraman)\n\nBotga ovozli yoki matnli xabar yuborsangiz ham, javob beraman. Ismimni yozsangiz yoki aytsangiz, \"Labbay!\" deyman.", { reply_markup: appKeyboard() });
 }
 async function cmdAdmin(msg, user, arg) {
   if (!ADMINS.includes(user.id)) return;
@@ -230,7 +258,7 @@ async function quickChat(msg, user, text, dur) {
   const tgt = L.targets(st.words, 5);
   try {
     const ch = (st.settings && st.settings.char) || {};
-    const out = await S.runAI(user, 'chat', { character: ch.id, name: ch.name, style: st.settings && st.settings.style, corrections: st.settings && st.settings.corrections, lang: st.settings && st.settings.lang, about: st.settings && st.settings.about, weak: S.prompts.weakOf(st.mistakes).map((x) => x.cat), topic: 'free', level: (st.settings && st.settings.level) || 'B1', turns, learning: tgt.map((w) => w.w) });
+    const out = await S.runAI(user, 'chat', { character: ch.id, name: ch.name, style: st.settings && st.settings.style, corrections: st.settings && st.settings.corrections, lang: st.settings && st.settings.lang, about: st.settings && st.settings.about, weak: S.prompts.weakOf(st.mistakes).map((x) => x.cat), topic: 'free', level: (st.settings && st.settings.level) || 'B1', turns, learning: tgt.map((w) => w.w), speakDay: spChat(st) });
     const m = out.text.match(/\{[\s\S]*\}/);
     try { r = m ? JSON.parse(m[0]) : null; } catch (x) { r = null; }
     if (!r || !r.reply) r = { emotion: 'happy', reply: (r && r.reply) || out.text.replace(/[{}"]/g, '').slice(0, 600) };
@@ -446,6 +474,7 @@ async function handleUpdate(u) {
     if (c === 'start') return cmdStart(msg, user);
     if (c === 'stats') return cmdStats(msg, user);
     if (c === 'words') return cmdWords(msg, user);
+    if (c === 'ibora' || c === 'iboralar' || c === 'phrases' || c === 'speak') return cmdSpeak(msg, user);
     if (c === 'review' || c === 'takror' || c === 'quiz') return cmdReview(msg, user);
     if (c === 'tarjima' || c === 'translate') return sendTranslate(msg.chat.id, user);
     if (c === 'tinglash' || c === 'listen' || c === 'story') return cmdStory(msg, user);
@@ -540,6 +569,8 @@ async function remindOne(row, hour, day) {
   const tgt = L.targets(st.words, 2);
   let text = `⏰ ${fire}<b>Gapirish mashqi vaqti!</b>\n\n🗣 <b>${esc(en)}</b>\n<tg-spoiler>${esc(uz)}</tg-spoiler>\n\nOvozli xabar bilan inglizcha javob bering. Xatolaringizni o'zbekcha tushuntirib beraman.`;
   if (tgt.length) text += `\n🎯 Javobda shu so'zlarni ishlating: <b>${tgt.map((w) => esc(w.w)).join(', ')}</b>`;
+  const sd = SPEAK.days[spCur(st)];
+  if (sd) { const ph = sd.list.slice(0, 10).sort(() => Math.random() - 0.5).slice(0, 3).map((x) => x.split('|')[0].replace('{name}', spName(user))); text += `\n🚀 Tayyor iboralar (${esc(sd.t)}): ${ph.map((x) => '<b>' + esc(x) + '</b>').join(' · ')}\nTo'liq ro'yxat: /ibora`; }
   if (one) text += `\n\n🔁 <i>Esingizdami?</i> ${one.said ? '<s>' + esc(one.said) + '</s> → ' : ''}<b>${esc(one.better)}</b>`;
   const lastTest = (st.tests || []).slice(-1)[0];
   if ((!lastTest || lastTest.day < addDaysT(-30)) && Object.keys(st.days || {}).length >= 3) text += "\n\n📈 Oylik gapirish testi vaqti keldi: Mini Appda «Sozlamalar → Gapirish testi».";
@@ -598,7 +629,7 @@ async function setup({ publicUrl, secret, polling }) {
   appUrl = publicUrl;
   await tg('setMyCommands', { commands: [
     { command: 'start', description: 'Boshlash' }, { command: 'stats', description: 'Natijalarim' },
-    { command: 'dars', description: 'Bugungi dars (10 daqiqa)' }, { command: 'audio', description: "Audio dars: o'rgangan so'zlarimdan dialog" }, { command: 'ertak', description: "Ertak va qo'shiqlar" }, { command: 'review', description: "So'z yodlash (tugmali test)" }, { command: 'tarjima', description: 'Tez tarjima mashqi' }, { command: 'tinglash', description: 'Tinglash: hikoya va savollar' }, { command: 'words', description: "Takrorlash uchun so'zlar" }, { command: 'premium', description: 'Premium (Stars)' },
+    { command: 'ibora', description: "🚀 Tez gapirish: bugungi 10 ibora" }, { command: 'dars', description: 'Bugungi dars (10 daqiqa)' }, { command: 'audio', description: "Audio dars: o'rgangan so'zlarimdan dialog" }, { command: 'ertak', description: "Ertak va qo'shiqlar" }, { command: 'review', description: "So'z yodlash (tugmali test)" }, { command: 'tarjima', description: 'Tez tarjima mashqi' }, { command: 'tinglash', description: 'Tinglash: hikoya va savollar' }, { command: 'words', description: "Takrorlash uchun so'zlar" }, { command: 'premium', description: 'Premium (Stars)' },
     { command: 'remind', description: 'Eslatma soatlari' }, { command: 'name', description: 'Hamrohga ism berish' }, { command: 'settings', description: 'Javob tili va ovoz (ayol/erkak)' }, { command: 'report', description: 'Haftalik hisobot' }, { command: 'about', description: "O'zim haqimda (suhbat shunga moslashadi)" }, { command: 'help', description: 'Yordam' }] });
   if (appUrl) await tg('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Gaplashish', web_app: { url: appUrl + '/' } } });
   setInterval(() => reminderTick().catch((e) => console.error('remind', e.message)), 5 * 60000).unref();

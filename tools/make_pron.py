@@ -27,7 +27,7 @@ for line in open(sys.argv[1], encoding='utf-8', errors='ignore'):
 with gzip.open(os.path.join(ROOT, 'server', 'pron.txt.gz'), 'wt', encoding='utf-8') as f:
     for w, r in words.items(): f.write(w + '\t' + r + '\n')
 text = ''
-for p in ['web/core3000.js', 'web/packs.js', 'web/fun.js', 'web/app.js', 'shared/prompts.js']:
+for p in ['web/core3000.js', 'web/packs.js', 'web/fun.js', 'web/speak.js', 'web/app.js', 'shared/prompts.js']:
     text += open(os.path.join(ROOT, p), encoding='utf-8').read().lower()
 used = sorted(set(re.findall(r"[a-z]+(?:'[a-z]+)?", text)))
 sub = {w: words[w] for w in used if w in words}

@@ -176,6 +176,13 @@ Pastki menyuda to'rtinchi bo'lim: **Ertak·Qo'shiq** (botda `/ertak`). Hammasi A
 - **Pullik AI ulash**: Mini App → Sozlamalar → "AI kalitlari" (faqat egasi ko'radi) → Claude (`ANTHROPIC_API_KEY`) yoki OpenAI (`OPENAI_API_KEY`) kalitini kiriting. Kalit darhol tekshiriladi va ishlasa, navbatda birinchi turadi (bepullar zaxiraga o'tadi). Model: `CLAUDE_MODEL` (standart `claude-haiku-5-5`), `OPENAI_CHAT_MODEL`. O'chirish: `AI_PREFER_PAID=0`.
 - OpenAI'da kredit bo'lsa, botning ovozli javoblari ham ishlaydi.
 
+## 🚀 Tez gapirish: 300 ta eng kerakli ibora (2026-11-28)
+- Mashq bo'limida "🚀 Tez gapirish": 30 kun × 10 ta tayyor og'zaki ibora, eng kerakligidan boshlab: suhbatda qolib ketmaslik, tanishuv, kichik suhbat, ishda kundalik, yig'ilish, telefon, muammo haqida xabar, texnik tushuntirish, qurilish maydoni, hisobot, aeroport, mehmonxona, taksi, restoran, sog'liq va boshqalar.
+- Har kun: tinglash (inglizcha → o'zbekcha → inglizcha) → takrorlash (soya mashqi) → o'zbekchadan aytish → hamroh bilan shu mavzuda rolli suhbat.
+- Kundalik darsning birinchi qadami endi "🚀 Iboralar". O'tilgan iboralar kartochkalarga qo'shiladi va takrorlanadi.
+- Hamroh har bir suhbatda bugungi iboralarni ishlatishga sharoit yaratadi, javob g'oyalarida ularni taklif qiladi va ishlatganingizda maqtaydi (botdagi suhbatda ham).
+- Bot: /ibora (bugungi 10 ta ibora, o'qilishi va tarjimasi bilan, kunlar bo'yicha varaqlash), kunduzgi eslatmada 3 ta ibora.
+
 ## 🔤 O'qilishi: inglizcha so'z va gaplar o'zbek harflarida (2026-11-27)
 - Har bir so'z va misol gap ostida o'qilishi chiqadi: deadline → **dedlayn**, water → **uotar**, enough → **inaf**. Kartochka, test, ovozli yodlash, "Mening so'zlarim" ro'yxati, soya mashqi va tez tarjimada.
 - Ertak, audio dars va qo'shiqlarda "🔤 O'qilishi" tugmasi har bir qator ostida o'qilishini ko'rsatadi.

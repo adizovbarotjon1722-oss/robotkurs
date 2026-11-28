@@ -11,7 +11,7 @@ const SERVER = !!TG;
 const inViewer = !TG && !!(window.claude && window.claude.use);
 
 /* ================= storage (+ server sync inside Telegram) ================= */
-const SYNC_KEYS = ['words','days','settings','lastDay','chat','mistakes','flu','tests','story','lesson','lessonDays'];
+const SYNC_KEYS = ['words','days','settings','lastDay','chat','mistakes','flu','tests','story','lesson','lessonDays','speak'];
 let syncT = null, syncBase = 0, synced = false;
 const LS = {
   get(k, d){ try { const v = localStorage.getItem('qumri_'+k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
@@ -559,7 +559,7 @@ const QUICK = ['free','standup','problem','site','engjob','airport','hotel','tax
 function pickTopic(k){
   if (!P.pick(P.TOPICS, k)) return;
   const t = P.TOPICS[k];
-  topic = k; settings.topic = k; saveSettings(); renderTopics(); stopListen(); stopSpeaking();
+  topic = k; settings.topic = k; if (spState.role){ spState.role = null; speakSave(); } saveSettings(); renderTopics(); stopListen(); stopSpeaking();
   $('topicSheet').classList.remove('open');
   const r = { emotion: t.game || t.rp ? 'excited' : 'happy', reply: rnd(t.open), praise_uz: t.game ? t.d + '.' : t.rp ? "Rol o'yini: hayotdagidek gaplashamiz." : '' };
   turns.push({ role:'assistant', content: JSON.stringify({ emotion:r.emotion, reply:r.reply }) }); saveChat();
@@ -630,8 +630,9 @@ async function send(text, dur){
   addMsg('me', text); setEmo('thinking'); status('thinking', cname() + " o'ylayapti…"); $('talk').classList.add('busy');
   turns.push({ role:'user', content:text }); activity();
   try {
-    const raw = await ai('chat', { topic, style:settings.style, corrections:settings.corrections, lang:settings.lang, about:settings.about || '', weak:P.weakOf(mistakes).map(x => x.cat), level:settings.level, turns:turns.slice(-20), learning:learningWords(), character:settings.char.id, name:cname() });
+    const raw = await ai('chat', { topic, style:settings.style, corrections:settings.corrections, lang:settings.lang, about:settings.about || '', weak:P.weakOf(mistakes).map(x => x.cat), level:settings.level, turns:turns.slice(-20), learning:learningWords(), character:settings.char.id, name:cname(), speakDay:speakChatDay(), roleplay:!!(spState.role && spState.role.day === today()) });
     if (!String(raw).trim()) throw Object.assign(new Error('empty'), { code:'empty' });
+    if (spState.role){ spState.role.n = (spState.role.n || 0) + 1; if (spState.role.n >= 10 || spState.role.day !== today()) spState.role = null; speakSave(); }
     const r = parseJSON(raw, { emotion:'happy', reply:raw.trim(), tip:null });
     if (!r.reply) r.reply = "Sorry, can you say that again?";
     const keep = { emotion:r.emotion, reply:r.reply }; if (r.memo && P.TOPICS[topic].game) keep.memo = String(r.memo).slice(0, 300);
@@ -1288,13 +1289,14 @@ async function initTelegram(){
   try {
     const r = await api('/api/me'); const j = await r.json(); quota = j.quota; renderQuota(); renderRemind(j.remind || []); serverVoice = j.voice !== false; syncBase = +j.now || Date.now(); synced = true; if (j.admin) initAdmin();
     const s = j.state || {};
-    if (s.flu) flu = s.flu; if (Array.isArray(s.tests)) tests = s.tests; if (s.story) story = s.story; if (s.lesson) lesson = s.lesson; if (s.mistakes) mistakes = s.mistakes; if (s.words) words = s.words; if (s.days) days = s.days; if (s.chat) chat = s.chat; if (s.settings){ Object.assign(settings, s.settings); applyCalm(); $('corrections').value = settings.corrections; $('ansLang').value = settings.lang || 'both'; $('about').value = settings.about || ''; $('gender').value = settings.gender || 'auto'; $('calm').checked = settings.calm === false; settings.char = Object.assign({ id:'nur', color:'', acc:'none', name:'' }, settings.char || {}); if (!P.pick(P.STYLES, settings.style)) settings.style = 'samimiy'; if (!P.pick(P.TOPICS, settings.topic)) settings.topic = 'free'; topic = settings.topic; paintChar(); CH.paint($('avatarSvg'), settings.char, true); }
+    if (s.flu) flu = s.flu; if (Array.isArray(s.tests)) tests = s.tests; if (s.story) story = s.story; if (s.lesson) lesson = s.lesson; if (s.speak) spState = Object.assign({ done: [], role: null }, s.speak); if (s.mistakes) mistakes = s.mistakes; if (s.words) words = s.words; if (s.days) days = s.days; if (s.chat) chat = s.chat; if (s.settings){ Object.assign(settings, s.settings); applyCalm(); $('corrections').value = settings.corrections; $('ansLang').value = settings.lang || 'both'; $('about').value = settings.about || ''; $('gender').value = settings.gender || 'auto'; $('calm').checked = settings.calm === false; settings.char = Object.assign({ id:'nur', color:'', acc:'none', name:'' }, settings.char || {}); if (!P.pick(P.STYLES, settings.style)) settings.style = 'samimiy'; if (!P.pick(P.TOPICS, settings.topic)) settings.topic = 'free'; topic = settings.topic; paintChar(); CH.paint($('avatarSvg'), settings.char, true); }
     SYNC_KEYS.forEach(k => { if (s[k] != null) try { localStorage.setItem('qumri_'+k, JSON.stringify(s[k])); } catch(e){} });
     $('level').value = settings.level; $('goal').value = String(settings.goal); $('rate').value = String(settings.rate);
     renderGoal(); renderBadge(); renderTopics(); startTalk(false); setTimeout(testNudge, 1200);
     const start = new URLSearchParams(location.search).get('room') || (TG.initDataUnsafe && TG.initDataUnsafe.start_param);
     if (start === 'words' || start === 'drill' || start === 'fun'){ setRoom(start); sync(); }
     if (start === 'audio'){ setRoom('drill'); renderEpisodes($('drill')); sync(); }
+    if (start === 'speak'){ setRoom('drill'); renderSpeak($('drill')); sync(); }
   } catch(e){ status('', errText(e)); }
   window.addEventListener('pagehide', () => { if (syncT){ clearTimeout(syncT); pushState(); } });
   document.addEventListener('visibilitychange', () => { if (document.hidden && syncT){ clearTimeout(syncT); pushState(); } });
@@ -1435,8 +1437,8 @@ function drillDone(box, title, ok, n, onDone, again){
   if (ok === n) feathers(c, 10);
 }
 /* ---- quick translation: Uzbek sentence, say it in English within 5 seconds ---- */
-function runTranslate(box, n, onDone){
-  const items = pickPairs(n); let i = 0, ok = 0;
+function runTranslate(box, n, onDone, given){
+  const items = given || pickPairs(n); let i = 0, ok = 0;
   refillBank();
   const step = () => {
     if (i >= items.length) return drillDone(box, 'Tez tarjima', ok, items.length, onDone, () => runTranslate(box, n));
@@ -1485,6 +1487,7 @@ function runShadow(box, items, onDone){
       if (r.score >= 85 || tries >= 3){ if (r.score >= 85) ok++; const nx = btn('btn primary dnext', i + 1 < items.length ? 'Keyingisi →' : 'Natija', () => { i++; step(); }); c.append(nx); }
       else play(0.8);
     }, 'Takrorlash');
+    c.append(btn('tool', "⏭ O'tkazib yuborish", () => { stopListen(); stopSpeaking(); i++; step(); }));
     box.append(c); play(settings.rate);
   };
   step();
@@ -1925,10 +1928,79 @@ async function newFun(box, kind){
   }
 }
 
+/* ================= 🚀 Tez gapirish: 300 ready-made spoken phrases, 10 a day =================
+   Listen → repeat (shadowing) → say it from Uzbek → a role-play in the chat where the companion
+   creates moments for exactly these phrases. The chat also nudges today's phrases in every talk. */
+const SPK = window.QumriSpeak || { days: [] };
+let spState = Object.assign({ done: [], role: null }, LS.get('speak', {}));
+const myName = () => { const n = TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.first_name; return /^[A-Za-z' -]{2,20}$/.test(n || '') ? n : 'Alex'; };
+const spkItems = d => SPK.days[d].list.map(x => { const [en, uz] = x.split('|'); return { en: en.replace('{name}', myName()), uz: uz.replace('{name}', myName()) }; });
+const speakCur = () => { for (let d = 0; d < SPK.days.length; d++) if (!spState.done.includes(d)) return d; return -1; };
+/* the day the chat should nudge: today's unfinished one, or the last one finished */
+function speakChatDay(){ if (!spState.done.length) return undefined; const c = speakCur(); return spState.role && spState.role.day === today() ? spState.role.d : c >= 0 && spState.started ? c : spState.done[spState.done.length - 1]; }
+function speakSave(){ LS.set('speak', spState); }
+function speakFinish(d){
+  if (!spState.done.includes(d)){ spState.done.push(d); spState.done.sort((a, b) => a - b); }
+  speakSave();
+  addWords(spkItems(d).map(x => ({ w: x.en, uz: x.uz })), 'phrase', 10);
+}
+function renderSpeak(box){
+  box.innerHTML = ''; stopSpeaking();
+  const cur = speakCur(), c = el('div', 'dcard');
+  c.append(el('div', 'dstep', `🚀 Tez gapirish · ${spState.done.length}/${SPK.days.length} kun · ${spState.done.length * 10} ta ibora`), el('div', 'dtitle', "Eng kerakli 300 ta tayyor ibora"));
+  c.append(el('p', 'note', "Gapirishni so'z yodlashdan emas, tayyor iboralardan boshlash eng tez yo'l. Har kuni 10 ta: eshiting, takrorlang, o'zbekchadan ayting, keyin hamroh bilan rolli suhbatda ishlating. Ish, muhandislik va sayohat uchun tanlangan."));
+  const bar = el('div', 'spbar'); const fill = el('i'); fill.style.width = (spState.done.length / SPK.days.length * 100) + '%'; bar.append(fill); c.append(bar);
+  if (cur >= 0){ const d = SPK.days[cur]; c.append(btn('btn primary big', `${d.ic} ${cur + 1}-kun: ${d.t} →`, () => runSpeakDay(box, cur))); }
+  else c.append(el('div', 'dres good', "🎉 Hamma 30 kun tugadi! Istalgan kunni qayta takrorlang."));
+  box.append(c);
+  const grid = el('div', 'spgrid');
+  SPK.days.forEach((d, i) => { const b = btn('spd' + (spState.done.includes(i) ? ' done' : '') + (i === cur ? ' cur' : ''), '', () => runSpeakDay(box, i)); b.append(el('span', null, d.ic), el('b', null, (i + 1) + '. ' + d.t)); grid.append(b); });
+  box.append(grid);
+  const foot = el('div', 'drow'); foot.append(btn('btn', '← Orqaga', renderDrill)); box.append(foot);
+}
+/* one day; inLesson: the role-play becomes the lesson's own "talk" step */
+function runSpeakDay(box, d, onDone){
+  box.innerHTML = ''; stopSpeaking();
+  const day = SPK.days[d], items = spkItems(d), c = el('div', 'dcard ep');
+  spState.started = true; speakSave();
+  c.append(el('div', 'dstep', `🚀 ${d + 1}-kun · 10 ta ibora · 1) tinglang 2) takrorlang 3) o'zbekchadan ayting 4) suhbatda ishlating`), el('div', 'dtitle', day.ic + ' ' + day.t));
+  let run = 0;
+  const playAll = async () => { const my = ++run; for (let i = 0; i < items.length && run === my; i++){ mark(i); await speakParts([{ text: items[i].en, rate: 0.85, pause: 350 }, { text: items[i].uz, uz: true, force: true, pause: 350 }, { text: items[i].en, rate: 0.85 }]); if (run === my) await sleep(700); } mark(-1); };
+  const ctl = el('div', 'drow epctl');
+  ctl.append(btn('btn', '▶ Hammasini tinglash', playAll), btn('btn', '⏹', () => { run++; stopSpeaking(); mark(-1); }), volBtn()); c.append(ctl);
+  const list = el('div', 'eplines showuz');
+  const rows = items.map((x, i) => { const r = el('div', 'epl n'); r.append(el('div', 'en', x.en), rdEl(x.en, 'rd rdex'), el('div', 'uz', x.uz)); r.onclick = () => { run++; mark(i); speakParts([{ text: x.en, rate: 0.85 }]); }; list.append(r); return r; });
+  const mark = i => rows.forEach((r, k) => r.classList.toggle('cur', k === i));
+  c.append(list);
+  const go = el('div', 'drow');
+  const stop = () => { run++; stopSpeaking(); };
+  go.append(btn('btn primary', "🦜 Mashqni boshlash →", () => { stop(); speakDrill(box, d, onDone); }));
+  if (!onDone) go.append(btn('btn', '← Orqaga', () => { stop(); renderSpeak(box); }));
+  c.append(go); box.append(c);
+}
+function speakDrill(box, d, onDone){
+  const items = spkItems(d);
+  runShadow(box, items, () => runTranslate(box, 5, () => speakRolePlay(box, d, onDone), shuffle(items.slice()).slice(0, 5)));
+}
+function speakRolePlay(box, d, onDone){
+  box.innerHTML = ''; const day = SPK.days[d], c = el('div', 'dcard');
+  c.append(el('div', 'dstep', `🗣 ${d + 1}-kun · rolli suhbat`), el('div', 'dtitle', day.ic + ' ' + day.t));
+  c.append(el('p', null, `${cname()} bilan qisqa rolli suhbat: bugungi iboralarni o'z gapingizda ishlating. 4-5 marta javob bering. Ishlatgan iborangizni ${cname()} maqtaydi, qiynalsangiz javob g'oyasini ko'rsatadi.`));
+  const start = () => {
+    speakFinish(d); spState.role = { d, day: today() }; speakSave();
+    if (onDone) lessonMark('phrases');
+    const r = { emotion: 'happy', reply: day.go };
+    turns.push({ role: 'assistant', content: JSON.stringify(r) }); saveChat();
+    setRoom('talk'); qMsg(Object.assign({ praise_uz: `🚀 Rolli suhbat: ${day.t}` }, r)); speakTurn(r, true);
+  };
+  const row = el('div', 'drow');
+  row.append(btn('btn primary', "🗣 Suhbatni boshlash", start), btn('tool', "Keyinroq", () => { speakFinish(d); onDone ? onDone() : renderSpeak(box); }));
+  c.append(row); box.append(c);
+}
 /* ---- the daily 10-minute lesson ---- */
 const LESSON = [
+  { id:'phrases', ic:'🚀', t:'Iboralar', d:'4 daq' },
   { id:'words', ic:'📚', t:"So'zlar", d:'2 daq' },
-  { id:'shadow', ic:'🦜', t:'Soya mashqi', d:'2 daq' },
   { id:'translate', ic:'⚡', t:'Tez tarjima', d:'2 daq' },
   { id:'talk', ic:'🗣', t:'Suhbat (3 ta javob)', d:'3 daq' },
   { id:'mistakes', ic:'🔁', t:'Xatolarim', d:'1 daq' }
@@ -1950,6 +2022,12 @@ function runLesson(box){
   if (!next){ renderDrill(); return; }
   const fin = () => { lessonMark(next.id); go(); };
   if (next.id === 'words'){ if (!due().length){ lessonMark('words'); return go(); } return runWordCheck(box, 6, fin); }
+  if (next.id === 'phrases'){
+    const d = speakCur();
+    if (d >= 0) return runSpeakDay(box, d, fin);
+    const pool = shuffle(spState.done.flatMap(spkItems)).slice(0, 6); /* all 30 days done: repeat a mix */
+    return runShadow(box, pool, fin);
+  }
   if (next.id === 'shadow') return runShadow(box, shadowItems(3), fin);
   if (next.id === 'translate') return runTranslate(box, 3, fin);
   if (next.id === 'talk'){
@@ -1976,6 +2054,9 @@ function renderDrill(){
   c.append(steps);
   c.append(full ? el('div', 'dres good', "✅ Bugungi dars tugadi! Bonus sifatida bitta ertak yoki qo'shiq tinglang 🎵") : btn('btn primary big', l.done.length ? 'Davom ettirish' : 'Boshlash', () => runLesson(box)));
   box.append(c);
+  const sc = speakCur(), sp = btn('dpick hot', '', () => renderSpeak(box));
+  sp.append(el('span', 'dic', '🚀'), el('b', null, `Tez gapirish · ${spState.done.length * 10}/300 ibora`), el('small', null, sc >= 0 ? `Bugun: ${SPK.days[sc].t}. Eng kerakli tayyor iboralar va ular bilan rolli suhbat.` : 'Hammasi tugadi! Qayta takrorlang.'));
+  box.append(sp);
   const cards = [
     ['🎙', 'Audio dars (2-3 daqiqa)', "O'rgangan so'zlaringizdan dialog yoki hikoya: ikki xil ovoz, gapma-gap tarjima, takrorlab tinglash rejimi.", () => renderEpisodes(box)],
     ['⚡', 'Tez tarjima', "O'zbekcha gapni 5 soniyada inglizcha ayting. Gapni tarjima qilmasdan, to'g'ridan-to'g'ri aytishga o'rgatadi.", () => runTranslate(box, 8)],

@@ -123,6 +123,7 @@ function mergeState(cur, s, base) {
     if ((cur.lesson.day || '') > (s.lesson.day || '')) out.lesson = cur.lesson;
     else if (cur.lesson.day === s.lesson.day) out.lesson = { day: s.lesson.day, done: [...new Set((s.lesson.done || []).concat(cur.lesson.done || []))], talk: Math.max(+s.lesson.talk || 0, +cur.lesson.talk || 0) };
   }
+  if (cur.speak && s.speak) out.speak = Object.assign({}, s.speak, { done: [...new Set((s.speak.done || []).concat(cur.speak.done || []))].sort((a, b) => a - b) });
   if (Array.isArray(cur.lessonDays) && Array.isArray(s.lessonDays)) out.lessonDays = [...new Set(cur.lessonDays.concat(s.lessonDays))].sort().slice(-400);
   if (Array.isArray(s.tests) || Array.isArray(cur.tests)) {
     const all = new Map(); (cur.tests || []).concat(s.tests || []).forEach((x) => x && x.day && all.set(x.day + '|' + (x.at || 0), x));
@@ -178,6 +179,11 @@ function cleanState(s) {
   }
   if (s.lesson && typeof s.lesson === 'object' && day(s.lesson.day)) out.lesson = { day: s.lesson.day, done: (Array.isArray(s.lesson.done) ? s.lesson.done : []).filter((x) => /^[a-z]{2,12}$/.test(x)).slice(0, 10), talk: Math.max(0, Math.min(99, +s.lesson.talk || 0)) };
   if (Array.isArray(s.lessonDays)) out.lessonDays = s.lessonDays.filter((d) => day(d)).slice(-400);
+  if (s.speak && typeof s.speak === 'object') {
+    const r = s.speak.role;
+    out.speak = { done: [...new Set((Array.isArray(s.speak.done) ? s.speak.done : []).filter((d) => Number.isInteger(d) && d >= 0 && d < 30))].sort((a, b) => a - b), started: !!s.speak.started,
+      role: r && Number.isInteger(r.d) && r.d >= 0 && r.d < 30 && day(r.day) ? { d: r.d, day: r.day, n: Math.max(0, Math.min(99, +r.n || 0)) } : null };
+  }
   if (typeof s.lastDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.lastDay)) out.lastDay = s.lastDay;
   Object.keys(out).forEach((k) => out[k] === undefined && delete out[k]);
   return out;
