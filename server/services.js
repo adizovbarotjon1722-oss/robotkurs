@@ -203,7 +203,7 @@ async function rotate(svc, models, run) {
   let last, tried = 0;
   for (const m of models) {
     if (restingModel(svc, m)) continue;
-    if (tried++ >= 3) break;
+    if (tried++ >= 5) break; /* limit errors come back fast, so a few models fit in one try */
     try { const t = await run(m); modelRest.delete(svc + '|' + m); return t; }
     catch (e) {
       last = e;
