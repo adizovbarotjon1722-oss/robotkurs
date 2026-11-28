@@ -63,10 +63,22 @@ async function claude(messages, max) {
 
 /* Free option: Google Gemini (aistudio.google.com). Same prompts; roles map to user/model. */
 /* each Gemini model has its own free daily limit: when one is used up, the next model answers */
-const GEMINI_MODELS = () => [...new Set([C.geminiModel, 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemma-3-27b-it'])];
+let geminiFound = null; /* flash models this key can use, newest first (asked once) */
+async function geminiModels() {
+  if (!geminiFound) {
+    geminiFound = [];
+    try {
+      const r = await withTimeout('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': C.geminiKey } }, 15000);
+      const ids = ((await r.json()).models || []).filter((m) => (m.supportedGenerationMethods || []).includes('generateContent')).map((m) => String(m.name).replace('models/', ''));
+      const ver = (x) => +((x.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0);
+      geminiFound = ids.filter((x) => /^gemini-\d+(\.\d+)?-flash(-lite)?$/.test(x)).sort((a, b) => ver(b) - ver(a) || (/lite/.test(a) ? 1 : -1));
+    } catch (e) { geminiFound = null; }
+  }
+  return [...new Set([C.geminiModel, 'gemini-flash-latest'].concat(geminiFound || [], ['gemini-flash-lite-latest', 'gemma-3-27b-it']))];
+}
 async function gemini(messages, max) {
   if (!C.geminiKey) throw new ApiError('not_configured', 503);
-  return rotate('gemini', GEMINI_MODELS(), (model) => gemini1(model, messages, max));
+  return rotate('gemini', await geminiModels(), (model) => gemini1(model, messages, max));
 }
 async function gemini1(model, messages, max) {
   const contents = messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content) }] }));
@@ -650,7 +662,7 @@ function setKey(id, value) {
   resting.delete(def.engine); delete speed[def.engine]; delete picked[def.engine]; delete avail[def.engine];
   [...modelRest.keys()].forEach((k) => { if (k.startsWith(def.engine + '|')) modelRest.delete(k); });
   if (id === 'GROQ_API_KEY') { groqTtsModel = ''; delete freeDown.groq; }
-  if (id === 'GEMINI_API_KEY') { geminiTtsModel = ''; delete freeDown.gemini; }
+  if (id === 'GEMINI_API_KEY') { geminiTtsModel = ''; delete freeDown.gemini; geminiFound = null; }
   if (id === 'OPENAI_API_KEY') voiceOffUntil = 0;
   console.log('Kalit yangilandi: ' + def.label + (v ? ' (' + mask(v) + ')' : " (o'chirildi)"));
   /* measure the new key right away, so a working paid AI takes the lead without a restart */
